@@ -6,7 +6,7 @@ situation is described in text, the model picks one of the options, and you watc
 browser — alone (2048, Dino Run), many at once to compare players (all three), or head-to-head
 (Chess: two models play *each other*).
 
-Four models are supported (plus baseline players) and can be switched from the UI, in every game:
+Five models are supported (plus baseline players) and can be switched from the UI, in every game:
 
 | Model | Package | Checkpoint | Size |
 |---|---|---|---|
@@ -14,10 +14,11 @@ Four models are supported (plus baseline players) and can be switched from the U
 | **Jev-BERTa** | [`jev-berta`](https://github.com/leobitz/jev-berta) | [`leobitz/jev-berta-base-zeroshot-classifier`](https://huggingface.co/leobitz/jev-berta-base-zeroshot-classifier) | ~198M |
 | **Drex** | hosted API, [docs](https://drex.nace.ai/docs) | `drex-latest` (via `POST /v1/systemone`) | remote |
 | **Kev-0.8B** | [github.com/jaredpalmer/kev](https://github.com/jaredpalmer/kev) (run yourself) | [`jaredpalmer/kev-0.8b`](https://huggingface.co/jaredpalmer/kev-0.8b) | ~0.8B |
+| **GLiNER2.5-Decide** | [`gliner2`](https://pypi.org/project/gliner2/) | [`fastino/GLiNER2.5-Decide`](https://huggingface.co/fastino/GLiNER2.5-Decide) | ~340M |
 
-Laya and Jev are local, non-generative classifiers: they score a list of candidate answers against
-a context and return probabilities. None of the four was trained on any of these games. Each is
-loaded **once** and shared between all three games (`models.py`), not duplicated per game.
+Laya, Jev and GLiNER are local, non-generative classifiers: they score a list of candidate answers
+against a context and return probabilities. None of the five was trained on any of these games.
+Each is loaded **once** and shared between all three games (`models.py`), not duplicated per game.
 
 ## Quick start
 
@@ -25,7 +26,7 @@ Requires Python 3.10+. The first run downloads both local checkpoints (a few min
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install laya chess git+https://github.com/leobitz/jev-berta.git
+pip install laya chess gliner2 peft git+https://github.com/leobitz/jev-berta.git
 python server.py
 ```
 
@@ -79,6 +80,34 @@ or started the Kev server with `KEV_API_KEY` (see `.env.example` for `KEV_URL`/`
 `KEV_MODEL`/`KEV_CONCURRENCY`). Without it running, Kev just appears greyed out like an unconfigured
 Drex.
 
+## Running the benchmarks (headless, no browser)
+
+Each game has a small script that plays many games with no server and no browser — the quickest
+way to compare players. Run them from the activated venv, from this directory:
+
+| Script | What it does | Default players (no names given) |
+|---|---|---|
+| `bench.py` | Plays 2048 to the end, N times per player | `random`, `greedy`, `laya`, `jev` |
+| `bench_dino.py` | Plays Dino Run to a crash or the cap, N times per player | `laya`, `jev`, `random`, `oracle` |
+| `bench_chess.py` | Every pair of the given players plays once, alternating colors | `greedy`, `random` |
+
+```bash
+python bench.py 8                    # 8 games each, default players
+python bench.py 8 kev gliner         # 8 games each, only Kev and GLiNER (random/greedy always included)
+python bench_dino.py 5 gliner        # 5 runs, only GLiNER
+python bench_chess.py 200 greedy random laya jev kev gliner   # every pair plays once, 200-ply cap
+```
+
+Player names: `laya`, `jev`, `drex`, `kev`, `gliner`, plus each game's own baselines (`random` and
+`greedy` for 2048/Chess; `random` and `oracle` for Dino). The first argument is always the game
+count (2048/Dino) or the max-plies cutoff (Chess). Unlike the web UI, these scripts don't check
+availability first — naming `drex` without `DREX_API_KEY` set, or `kev` without its server running,
+raises an error immediately and stops the whole run rather than skipping just that player.
+
+Results print as plain text to the terminal — nothing is written to disk. This is separate from
+the Arena's saved `results_*.json` and the [Traces](#traces) log, which only capture games played
+through the web UI.
+
 ## Arena: many games at once
 
 Each game's Arena page runs several auto-play games (or, for Chess, matches) side by side and
@@ -122,17 +151,18 @@ enforced in code (step 1); the rest is only described in the prompt.
 
 | Player | Avg score | Typical best tile |
 |---|---|---|
-| random | ~690–950 | 32–128 |
+| random | ~690–1150 | 32–128 |
 | Laya | ~1160 | 32–256 |
 | Jev-BERTa | ~925 | 32–128 |
 | Kev-0.8B | ~950 | 32–256 |
+| GLiNER2.5-Decide | ~940 | 64–128 |
 | greedy (merge score, then empty cells) | ~3340 | 256 |
 
-**Honest takeaway:** all four models play at roughly random level, with Laya and Kev perhaps
+**Honest takeaway:** all five models play at roughly random level, with Laya and Kev perhaps
 slightly ahead. They can't plan ahead, and richer prompts made them *worse* — offering all four
 directions plus per-move lookahead text (no code-enforced rules) scored much lower (Laya ~790, Jev
 ~645) and made them pick illegal directions 10-20% of the time, so that mode was reverted. What
-helps is enforcing rules in code. A trivial greedy heuristic beats all four, so treat this as a
+helps is enforcing rules in code. A trivial greedy heuristic beats all five, so treat this as a
 demo of wiring decision
 models into a loop, not as a strong 2048 agent.
 
@@ -173,6 +203,13 @@ of the obstacle shown — 3/24 (12.5%) correct, worse than random's expected 33%
 wasn't a code bug (2048 and Chess both get varied, sensible answers from the same backend): it's a
 genuine bias of this specific checkpoint on this exact task, and Kev's own README says as much —
 "Use Kev-0.8B when size matters more than accuracy."
+
+**GLiNER2.5-Decide** is more interesting: across the same 24-sample test it correctly jumped every
+cactus and ducked every low bird, but across 10/10 separate checks it **never once answered `none`**
+— for a high bird it always ducks too, which is wrong. Net 18/24 (75%) correct, well above random's
+33%, but the one obstacle needing "keep running" is a blind spot it never gets, which explains the
+volatile 5-run benchmark (`cleared [30, 0, 0, 0, 6]`): a run survives as long as no high bird shows
+up early, then ends the moment one does.
 
 ## Chess
 
@@ -216,8 +253,8 @@ browser (JS)  --{white, black}-->  server.py  --keeps the chess.Board per match-
   king's square in red. Both boards are 340px (Arena) / 600px (Match) so the Arena grid holds two
   per row.
 
-**Benchmark:** `python bench_chess.py 200 greedy random laya jev kev` plays every pair once and
-prints a W/L/D tally (`200` = max plies before calling it a draw). No strong-play baseline is
+**Benchmark:** `python bench_chess.py 200 greedy random laya jev kev gliner` plays every pair once
+and prints a W/L/D tally (`200` = max plies before calling it a draw). No strong-play baseline is
 included — building a real chess engine is out of scope here — so treat match results as "which
 model reasons about a shortlisted position better than another," not absolute skill.
 
@@ -230,7 +267,9 @@ Laya vs Jev tends to drift into repeated back-and-forth moves once material sett
 away from actual repetition by the shortlist penalty, but the underlying "no multi-move plan"
 limitation remains) rather than building toward anything. **Kev-0.8B** was the pleasant surprise —
 in one small run it beat Random by checkmate in 30 plies and drew Greedy — noticeably more coherent
-here than in Dino Run, for whatever that's worth over such a small sample. Treat Chess like 2048
+here than in Dino Run, for whatever that's worth over such a small sample. **GLiNER2.5-Decide**
+drew both Greedy (fivefold repetition) and Random (ply limit) in its own small run — competent
+enough to avoid losing quickly, without forcing a decisive result either. Treat Chess like 2048
 and Dino Run: a demo of wiring decision models into a real, rules-correct game loop, not a strong
 chess engine.
 
@@ -287,6 +326,11 @@ behind one Laya lock, not three).
   choices, which a forced-move position (common near checkmate) would otherwise hit. `enginechess.
   Player.decide()` plays a single legal move directly without calling any backend, same as
   2048/Dino's "only one option" shortcuts.
+- **GLiNER's public API only returns the winning label's confidence**, not a full distribution —
+  `gliner2`'s `classify_text` normally reports just the argmax. `GlinerBackend` gets the full
+  distribution anyway by passing the documented `multi_label=True, cls_threshold=0.0,
+  class_act="softmax"` classification kwargs: every label clears the zero threshold, so the "which
+  labels passed" list ends up being all of them, each with its true softmax probability.
 - **Adding a model:** add a `Backend` subclass in `models.py` implementing `answer(state,
   instructions, criteria)`, register it in `BACKENDS`, then in each game's engine call
   `model_player("your_name")` and add it to that game's `PLAYERS`. It appears on both of that
