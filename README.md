@@ -114,7 +114,9 @@ Each game's Arena page runs several auto-play games (or, for Chess, matches) sid
 compares players.
 
 - **2048 / Dino Run:** tick the players to include and set **games per player**; every game runs
-  in parallel with a live mini board/track.
+  in parallel with a live mini board/track. **2048** starts every board in a run — every player,
+  every repeat — from the same two starting tiles (regenerated fresh on each **Start**), so a lucky
+  or unlucky opening doesn't decide the comparison.
 - **Chess:** tick 2+ players; every unordered pair plays **matches per pairing** games, alternating
   who's White, since color is a real advantage. There's no solo baseline run — it's inherently
   head-to-head.

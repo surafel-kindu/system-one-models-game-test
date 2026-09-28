@@ -15,6 +15,8 @@
 <main>
 <h1>Arena</h1>
 <p class=sub>Run many games at once, compare players, and keep high scores.</p>
+<p class=legend>Every board in a run starts from the same two tiles (same position, same values),
+so a lucky or unlucky start doesn't favor one player over another.</p>
 
 <div class=panel>
   <div class=ctl>
@@ -62,11 +64,11 @@ async function loadSaved(){saved=await (await fetch('/api/2048/results')).json()
 
 // ---- running games ----
 const newId=()=>(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));
-function mkGame(model){
+function mkGame(model,startGrid){
   const el=document.createElement('div');el.className='g';
   el.innerHTML=`<div class=h><b><span class=sw style="background:${color[model]}"></span>${label(model)}</b><span class=sc>0</span></div><div class=mini></div><div class=f><span class=mv>0 moves</span><span class=st>running</span></div>`;
   $('games').append(el);
-  return {model,gameId:newId(),grid:newGrid(),score:0,moves:0,ms:0,illegal:0,over:false,saved:false,el};
+  return {model,gameId:newId(),grid:startGrid.map(r=>r.slice()),score:0,moves:0,ms:0,illegal:0,over:false,saved:false,el};
 }
 function drawGame(g){
   g.el.querySelector('.mini').innerHTML=g.grid.flat().map(v=>`<div style="background:${TILE[v]||'#3c3a32'};color:${v>4?'#fff':'#776e65'}">${v||''}</div>`).join('');
@@ -98,7 +100,8 @@ async function start(){
   running=true;stopFlag=false;$('start').disabled=true;$('stop').disabled=false;
   if(!games.length)$('games').innerHTML='';
   games=[];$('games').innerHTML='';
-  picked.forEach(m=>{for(let i=0;i<n;i++)games.push(mkGame(m))});
+  const startGrid=newGrid();  // every board this run starts from the same two tiles, for a fair comparison
+  picked.forEach(m=>{for(let i=0;i<n;i++)games.push(mkGame(m,startGrid))});
   const tick=setInterval(()=>{const d=games.filter(g=>g.over).length;$('status').textContent=`${d}/${games.length} finished`;renderRun()},500);
   await Promise.all(games.map(play));
   clearInterval(tick);running=false;$('start').disabled=false;$('stop').disabled=true;
