@@ -112,6 +112,7 @@ JevPlayer = model_player("jev")
 DrexPlayer = model_player("drex")
 KevPlayer = model_player("kev")
 GlinerPlayer = model_player("gliner")
+BevPlayer = model_player("bev")
 LayaPlayer.baseline = JevPlayer.baseline = DrexPlayer.baseline = False
 
 
@@ -133,7 +134,7 @@ class OraclePlayer(Player):
 
 
 # To add a model: subclass Player (or use model_player), implement choose(state, crit), register it here.
-PLAYERS = {"laya": LayaPlayer, "jev": JevPlayer, "drex": DrexPlayer, "kev": KevPlayer, "gliner": GlinerPlayer, "random": RandomPlayer, "oracle": OraclePlayer}
+PLAYERS = {"laya": LayaPlayer, "jev": JevPlayer, "drex": DrexPlayer, "kev": KevPlayer, "gliner": GlinerPlayer, "bev": BevPlayer, "random": RandomPlayer, "oracle": OraclePlayer}
 _cache = {}
 
 

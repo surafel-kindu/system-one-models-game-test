@@ -90,7 +90,7 @@ def read_traces(game=None, model=None, game_id=None, q=None, limit=200):
 
 # Model backends (laya/jev/drex/kev) are shared across games (models.py caches by name), and torch
 # models aren't safe to call concurrently. Baseline players (random/greedy/oracle) need no lock.
-BACKEND_IDS = ("laya", "jev", "drex", "kev", "gliner")
+BACKEND_IDS = ("laya", "jev", "drex", "kev", "gliner", "bev")
 _slots = {}
 
 

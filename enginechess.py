@@ -163,6 +163,7 @@ JevPlayer = model_player("jev")
 DrexPlayer = model_player("drex")
 KevPlayer = model_player("kev")
 GlinerPlayer = model_player("gliner")
+BevPlayer = model_player("bev")
 LayaPlayer.baseline = JevPlayer.baseline = DrexPlayer.baseline = False
 
 
@@ -186,7 +187,7 @@ class GreedyPlayer(Player):
 
 
 # To add a model: use model_player("name") after registering a Backend in models.py, then add it here.
-PLAYERS = {"laya": LayaPlayer, "jev": JevPlayer, "drex": DrexPlayer, "kev": KevPlayer, "gliner": GlinerPlayer, "random": RandomPlayer, "greedy": GreedyPlayer}
+PLAYERS = {"laya": LayaPlayer, "jev": JevPlayer, "drex": DrexPlayer, "kev": KevPlayer, "gliner": GlinerPlayer, "bev": BevPlayer, "random": RandomPlayer, "greedy": GreedyPlayer}
 _cache = {}
 
 

@@ -28,6 +28,11 @@ def _load_env(path=os.path.join(os.path.dirname(os.path.abspath(__file__)), ".en
 
 _load_env()
 
+# Hugging Face's newer "Xet" CDN backend has repeatedly stalled at 0 bytes on large files here
+# (hit this with both Kev and Bev-Decider's weights) while the classic HTTP path downloads fine.
+# Set before any `huggingface_hub` import runs; a real env var (e.g. to re-enable Xet) still wins.
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+
 
 class Backend:
     name = "base"
@@ -53,6 +58,21 @@ class LayaBackend(Backend):
     def answer(self, state, instructions, criteria):
         q = {"choice": {"type": "choice", "instructions": instructions, "criteria": criteria}}
         a = self.agent.system_one(state, q)["answers"]["choice"]
+        return a["choice"], a.get("probabilities", {})
+
+
+class BevBackend(Backend):
+    """avbiswas/bev-decider-0.4B: a Qwen3-0.6B-based decision model, same typed-question shape as
+    Laya but decide() returns answers keyed directly by question id (no "answers" wrapper)."""
+    name, label = "bev", "Bev-Decider-0.4B"
+
+    def __init__(self, model="avbiswas/bev-decider-0.4B"):
+        from bev_decider import load
+        self.decider = load(model)
+
+    def answer(self, state, instructions, criteria):
+        q = {"choice": {"type": "choice", "instructions": instructions, "criteria": criteria}}
+        a = self.decider.decide(state, q)["choice"]
         return a["choice"], a.get("probabilities", {})
 
 
@@ -176,7 +196,8 @@ class KevBackend(Backend):
                                 api_key=self.key, service_name="Kev server")
 
 
-BACKENDS = {"laya": LayaBackend, "jev": JevBackend, "drex": DrexBackend, "kev": KevBackend, "gliner": GlinerBackend}
+BACKENDS = {"laya": LayaBackend, "jev": JevBackend, "drex": DrexBackend, "kev": KevBackend,
+            "gliner": GlinerBackend, "bev": BevBackend}
 _cache = {}
 
 

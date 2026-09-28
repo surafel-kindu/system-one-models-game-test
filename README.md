@@ -6,7 +6,7 @@ situation is described in text, the model picks one of the options, and you watc
 browser — alone (2048, Dino Run), many at once to compare players (all three), or head-to-head
 (Chess: two models play *each other*).
 
-Five models are supported (plus baseline players) and can be switched from the UI, in every game:
+Six models are supported (plus baseline players) and can be switched from the UI, in every game:
 
 | Model | Package | Checkpoint | Size |
 |---|---|---|---|
@@ -15,10 +15,12 @@ Five models are supported (plus baseline players) and can be switched from the U
 | **Drex** | hosted API, [docs](https://drex.nace.ai/docs) | `drex-latest` (via `POST /v1/systemone`) | remote |
 | **Kev-0.8B** | [github.com/jaredpalmer/kev](https://github.com/jaredpalmer/kev) (run yourself) | [`jaredpalmer/kev-0.8b`](https://huggingface.co/jaredpalmer/kev-0.8b) | ~0.8B |
 | **GLiNER2.5-Decide** | [`gliner2`](https://pypi.org/project/gliner2/) | [`fastino/GLiNER2.5-Decide`](https://huggingface.co/fastino/GLiNER2.5-Decide) | ~340M |
+| **Bev-Decider-0.4B** | [`bev-decider`](https://pypi.org/project/bev-decider/) | [`avbiswas/bev-decider-0.4B`](https://huggingface.co/avbiswas/bev-decider-0.4B) | ~0.4B |
 
-Laya, Jev and GLiNER are local, non-generative classifiers: they score a list of candidate answers
-against a context and return probabilities. None of the five was trained on any of these games.
-Each is loaded **once** and shared between all three games (`models.py`), not duplicated per game.
+Laya, Jev, GLiNER and Bev are local, non-generative classifiers: they score a list of candidate
+answers against a context and return probabilities. None of the six was trained on any of these
+games. Each is loaded **once** and shared between all three games (`models.py`), not duplicated
+per game.
 
 ## Quick start
 
@@ -26,7 +28,7 @@ Requires Python 3.10+. The first run downloads both local checkpoints (a few min
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
-pip install laya chess gliner2 peft git+https://github.com/leobitz/jev-berta.git
+pip install laya chess gliner2 peft bev-decider git+https://github.com/leobitz/jev-berta.git
 python server.py
 ```
 
@@ -65,12 +67,16 @@ decision model you host and run locally — no hosted API, no key. It speaks the
   document store) — don't `pip install kev`. The real thing only exists as the GitHub repo above.
 - Its `pyproject.toml` pins `torch>=2.6,<2.9`, which conflicts with this project's own torch (used
   by Laya/Jev). Give it a **separate venv**, not this project's `.venv`.
+- The first run downloads a real checkpoint (the 0.8B base model + adapter), and Hugging Face's
+  newer "Xet" CDN backend has repeatedly stalled at 0 bytes on large files here. Set
+  `HF_HUB_DISABLE_XET=1` before running `kev.serve` (this project's own `.venv` sets it
+  automatically for its own downloads — see Notes — but Kev's separate venv needs it set by hand).
 
 ```bash
 git clone https://github.com/jaredpalmer/kev.git kev-repo && cd kev-repo
 python3.13 -m venv .venv && source .venv/bin/activate   # a separate venv from this project's
 pip install -e ".[serve]"                                # pulls in mlx-lm on Apple Silicon
-python -m kev.serve --run jaredpalmer/kev-0.8b --port 8009
+HF_HUB_DISABLE_XET=1 python -m kev.serve --run jaredpalmer/kev-0.8b --port 8009
 ```
 
 Leave that running in its own terminal (first run downloads the base model + adapter), then back
@@ -93,12 +99,12 @@ way to compare players. Run them from the activated venv, from this directory:
 
 ```bash
 python bench.py 8                    # 8 games each, default players
-python bench.py 8 kev gliner         # 8 games each, only Kev and GLiNER (random/greedy always included)
-python bench_dino.py 5 gliner        # 5 runs, only GLiNER
-python bench_chess.py 200 greedy random laya jev kev gliner   # every pair plays once, 200-ply cap
+python bench.py 8 kev gliner bev     # 8 games each, only those three (random/greedy always included)
+python bench_dino.py 5 gliner
+python bench_chess.py 200 greedy random laya jev kev gliner bev   # every pair plays once, 200-ply cap
 ```
 
-Player names: `laya`, `jev`, `drex`, `kev`, `gliner`, plus each game's own baselines (`random` and
+Player names: `laya`, `jev`, `drex`, `kev`, `gliner`, `bev`, plus each game's own baselines (`random` and
 `greedy` for 2048/Chess; `random` and `oracle` for Dino). The first argument is always the game
 count (2048/Dino) or the max-plies cutoff (Chess). Unlike the web UI, these scripts don't check
 availability first — naming `drex` without `DREX_API_KEY` set, or `kev` without its server running,
@@ -158,13 +164,14 @@ enforced in code (step 1); the rest is only described in the prompt.
 | Jev-BERTa | ~925 | 32–128 |
 | Kev-0.8B | ~950 | 32–256 |
 | GLiNER2.5-Decide | ~940 | 64–128 |
+| Bev-Decider-0.4B | ~925 | 32–128 |
 | greedy (merge score, then empty cells) | ~3340 | 256 |
 
-**Honest takeaway:** all five models play at roughly random level, with Laya and Kev perhaps
+**Honest takeaway:** all six models play at roughly random level, with Laya and Kev perhaps
 slightly ahead. They can't plan ahead, and richer prompts made them *worse* — offering all four
 directions plus per-move lookahead text (no code-enforced rules) scored much lower (Laya ~790, Jev
 ~645) and made them pick illegal directions 10-20% of the time, so that mode was reverted. What
-helps is enforcing rules in code. A trivial greedy heuristic beats all five, so treat this as a
+helps is enforcing rules in code. A trivial greedy heuristic beats all six, so treat this as a
 demo of wiring decision
 models into a loop, not as a strong 2048 agent.
 
@@ -213,6 +220,11 @@ cactus and ducked every low bird, but across 10/10 separate checks it **never on
 volatile 5-run benchmark (`cleared [30, 0, 0, 0, 6]`): a run survives as long as no high bird shows
 up early, then ends the moment one does.
 
+**Bev-Decider-0.4B** shows a clean, consistent one-notch-off pattern across the same 24-sample
+test: it **never answers `jump`** (0/24) — a ground cactus always gets `duck` (wrong), a low bird
+always gets `none` (wrong), and a high bird always gets `none` (correct, 6/6). Net 6/24 (25%),
+close to random and worse than GLiNER; it seems to have learned "duck or run," never "jump."
+
 ## Chess
 
 Real chess (via [`python-chess`](https://python-chess.readthedocs.io/)) — legal moves, castling,
@@ -255,8 +267,8 @@ browser (JS)  --{white, black}-->  server.py  --keeps the chess.Board per match-
   king's square in red. Both boards are 340px (Arena) / 600px (Match) so the Arena grid holds two
   per row.
 
-**Benchmark:** `python bench_chess.py 200 greedy random laya jev kev gliner` plays every pair once
-and prints a W/L/D tally (`200` = max plies before calling it a draw). No strong-play baseline is
+**Benchmark:** `python bench_chess.py 200 greedy random laya jev kev gliner bev` plays every pair
+once and prints a W/L/D tally (`200` = max plies before calling it a draw). No strong-play baseline is
 included — building a real chess engine is out of scope here — so treat match results as "which
 model reasons about a shortlisted position better than another," not absolute skill.
 
@@ -271,9 +283,10 @@ limitation remains) rather than building toward anything. **Kev-0.8B** was the p
 in one small run it beat Random by checkmate in 30 plies and drew Greedy — noticeably more coherent
 here than in Dino Run, for whatever that's worth over such a small sample. **GLiNER2.5-Decide**
 drew both Greedy (fivefold repetition) and Random (ply limit) in its own small run — competent
-enough to avoid losing quickly, without forcing a decisive result either. Treat Chess like 2048
-and Dino Run: a demo of wiring decision models into a real, rules-correct game loop, not a strong
-chess engine.
+enough to avoid losing quickly, without forcing a decisive result either. **Bev-Decider-0.4B** also
+drew both Greedy and Random on ply limits in its small run — like GLiNER, safe but not sharp here,
+a contrast with its weaker Dino Run showing. Treat Chess like 2048 and Dino Run: a demo of wiring
+decision models into a real, rules-correct game loop, not a strong chess engine.
 
 ## Traces
 
@@ -333,6 +346,14 @@ behind one Laya lock, not three).
   distribution anyway by passing the documented `multi_label=True, cls_threshold=0.0,
   class_act="softmax"` classification kwargs: every label clears the zero threshold, so the "which
   labels passed" list ends up being all of them, each with its true softmax probability.
+- **Bev-Decider's `decide()` isn't wrapped in an `"answers"` key** the way Laya's `system_one()` is
+  — it returns `{question_id: {...}}` directly. `BevBackend` accounts for this; worth knowing if
+  you compare the two APIs directly, since they otherwise look identical (same typed-question shape).
+- **Hugging Face downloads:** `models.py` sets `HF_HUB_DISABLE_XET=1` by default (a real env var
+  still overrides it). HF's newer "Xet" CDN backend has repeatedly stalled at 0 bytes on large
+  checkpoints here (hit this with both Kev's and Bev-Decider's weights) while the classic HTTP path
+  downloads fine. This only covers downloads inside this project's own process — Kev runs as its
+  own separate server/venv, so its README documents setting the same variable there too.
 - **Adding a model:** add a `Backend` subclass in `models.py` implementing `answer(state,
   instructions, criteria)`, register it in `BACKENDS`, then in each game's engine call
   `model_player("your_name")` and add it to that game's `PLAYERS`. It appears on both of that
