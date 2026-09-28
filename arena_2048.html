@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2048 Arena</title>
+<link rel=stylesheet href="/style.css">
+<style>
+#games{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.g{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+.g.done{opacity:.75}
+.g .h{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}
+.g .f{font-size:11px;color:var(--muted);margin-top:5px;display:flex;justify-content:space-between}
+</style>
+<nav><div class=games><b>2048 · AI</b><a class=on href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a></div><div class=modes><a class=on href="/2048">Arena</a><a href="/2048/play">Single game</a><a href="/traces">Traces</a></div></nav>
+<main>
+<h1>Arena</h1>
+<p class=sub>Run many games at once, compare players, and keep high scores.</p>
+
+<div class=panel>
+  <div class=ctl>
+    <span id=players>Loading players…</span>
+    <label>Games per player <input type=number id=n value=3 min=1 max=20></label>
+    <button id=start>Start</button><button id=stop class=ghost disabled>Stop</button>
+    <button id=clear class=ghost title="Remove board cards from the page (saved results stay)">Clear boards</button>
+    <span id=status class=sub style="margin:0"></span>
+  </div>
+</div>
+
+<div class=panel><h2>Live boards</h2><div id=games><div class=empty>Nothing running yet — pick players and press Start.</div></div></div>
+
+<div class=cols>
+  <div>
+    <div class=panel><h2>This run</h2><div class=tbl id=runTbl><div class=empty>No finished games yet.</div></div></div>
+    <div class=panel><h2>All time (saved)</h2><div class=tbl id=allTbl><div class=empty>No saved games yet.</div></div></div>
+  </div>
+  <div class=panel><h2>High scores</h2><div class=tbl id=hi><div class=empty>No saved games yet.</div></div></div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const TILE={0:'#cdc1b4',2:'#eee4da',4:'#ede0c8',8:'#f2b179',16:'#f59563',32:'#f67c5f',64:'#f65e3b',128:'#edcf72',256:'#edcc61',512:'#edc850',1024:'#edc53f',2048:'#edc22e'};
+const PAL=['#f67c5f','#4c8dd6','#5aa469','#c98bd3','#e0a93b','#3fb8b0','#a0785a','#d9628b'];
+const MOVE_CAP=3000;
+let models=[],color={},games=[],running=false,stopFlag=false,saved=[];
+
+// ---- 2048 rules (mirrors engine.py) ----
+function slide(r){const t=r.filter(x=>x),o=[];let gain=0;for(let i=0;i<t.length;i++){if(t[i]==t[i+1]){o.push(t[i]*2);gain+=t[i]*2;i++}else o.push(t[i])}while(o.length<4)o.push(0);return[o,gain]}
+function mv(gr,d){let x=gr.map(r=>r.slice());if(d=='up'||d=='down')x=x[0].map((_,c)=>x.map(r=>r[c]));if(d=='right'||d=='down')x=x.map(r=>r.reverse());let gain=0;x=x.map(r=>{const[a,b]=slide(r);gain+=b;return a});if(d=='right'||d=='down')x=x.map(r=>r.reverse());if(d=='up'||d=='down')x=x[0].map((_,c)=>x.map(r=>r[c]));return[x,gain]}
+function spawn(gr){const e=[];gr.forEach((r,i)=>r.forEach((v,j)=>{if(!v)e.push([i,j])}));if(!e.length)return;const[i,j]=e[Math.random()*e.length|0];gr[i][j]=Math.random()<.9?2:4}
+const newGrid=()=>{const g=[...Array(4)].map(()=>[0,0,0,0]);spawn(g);spawn(g);return g};
+const label=id=>(models.find(m=>m.id==id)||{label:id}).label;
+
+// ---- setup ----
+async function init(){
+  models=await (await fetch('/api/2048/models')).json();
+  models.forEach((m,i)=>color[m.id]=PAL[i%PAL.length]);
+  $('players').innerHTML=models.map(m=>`<label class="${m.available?'':'off'}" title="${m.reason||''}"><input type=checkbox value="${m.id}" ${m.available&&!m.baseline?'checked':''} ${m.available?'':'disabled'}><span class=sw style="background:${color[m.id]}"></span>${m.label}${m.available?'':` <small>(${m.reason})</small>`}</label>`).join(' ');
+  await loadSaved();
+}
+async function loadSaved(){saved=await (await fetch('/api/2048/results')).json();renderAll()}
+
+// ---- running games ----
+const newId=()=>(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));
+function mkGame(model){
+  const el=document.createElement('div');el.className='g';
+  el.innerHTML=`<div class=h><b><span class=sw style="background:${color[model]}"></span>${label(model)}</b><span class=sc>0</span></div><div class=mini></div><div class=f><span class=mv>0 moves</span><span class=st>running</span></div>`;
+  $('games').append(el);
+  return {model,gameId:newId(),grid:newGrid(),score:0,moves:0,ms:0,illegal:0,over:false,saved:false,el};
+}
+function drawGame(g){
+  g.el.querySelector('.mini').innerHTML=g.grid.flat().map(v=>`<div style="background:${TILE[v]||'#3c3a32'};color:${v>4?'#fff':'#776e65'}">${v||''}</div>`).join('');
+  g.el.querySelector('.sc').textContent=g.score;g.el.querySelector('.mv').textContent=g.moves+' moves';
+}
+async function play(g){
+  drawGame(g);
+  while(!stopFlag&&!g.over){
+    const t=performance.now();
+    let r;try{r=await (await fetch('/api/2048/decide',{method:'POST',body:JSON.stringify({grid:g.grid,model:g.model,game_id:g.gameId})})).json()}catch(e){g.err=String(e);break}
+    g.ms+=performance.now()-t;
+    if(r.error){g.err=r.error;break}
+    if(!r.move){g.over=true;break}
+    if(r.illegal_pick)g.illegal++;
+    const[n,gain]=mv(g.grid,r.move);g.grid=n;g.score+=gain;g.moves++;spawn(g.grid);drawGame(g);
+    if(g.moves>=MOVE_CAP){g.over=true;g.capped=true}
+  }
+  if(g.over){
+    g.el.classList.add('done');g.el.querySelector('.st').textContent='best '+Math.max(...g.grid.flat());
+    const rec={model:g.model,score:g.score,best_tile:Math.max(...g.grid.flat()),moves:g.moves,ms_per_move:g.moves?Math.round(g.ms/g.moves):0,illegal_picks:g.illegal};
+    await fetch('/api/2048/results',{method:'POST',body:JSON.stringify(rec)});g.saved=true;
+    saved.push(rec);renderAll();
+  } else g.el.querySelector('.st').textContent=g.err?'error':'stopped';if(g.err){g.el.title=g.err;g.el.querySelector('.st').classList.add('err')}
+}
+async function start(){
+  const picked=[...document.querySelectorAll('#players input:checked')].map(i=>i.value);
+  if(!picked.length||running)return;
+  const n=Math.max(1,Math.min(20,+$('n').value||1));
+  running=true;stopFlag=false;$('start').disabled=true;$('stop').disabled=false;
+  if(!games.length)$('games').innerHTML='';
+  games=[];$('games').innerHTML='';
+  picked.forEach(m=>{for(let i=0;i<n;i++)games.push(mkGame(m))});
+  const tick=setInterval(()=>{const d=games.filter(g=>g.over).length;$('status').textContent=`${d}/${games.length} finished`;renderRun()},500);
+  await Promise.all(games.map(play));
+  clearInterval(tick);running=false;$('start').disabled=false;$('stop').disabled=true;
+  $('status').textContent=stopFlag?'stopped (unfinished games are not saved)':'all games finished';renderAll();
+}
+
+// ---- stats ----
+function summarize(rows){
+  const by={};
+  rows.forEach(r=>{(by[r.model]??=[]).push(r)});
+  return Object.entries(by).map(([id,rs])=>{
+    const sum=k=>rs.reduce((a,r)=>a+r[k],0),dist={};
+    rs.forEach(r=>dist[r.best_tile]=(dist[r.best_tile]||0)+1);
+    return {id,games:rs.length,avg:sum('score')/rs.length,best:Math.max(...rs.map(r=>r.score)),tile:Math.max(...rs.map(r=>r.best_tile)),
+      moves:sum('moves')/rs.length,ill:rs.reduce((x,r)=>x+(r.illegal_picks||0),0)/Math.max(1,sum('moves')),ms:sum('ms_per_move')/rs.length,r512:rs.filter(r=>r.best_tile>=512).length/rs.length,dist};
+  }).sort((a,b)=>b.avg-a.avg);
+}
+function table(rows,empty){
+  if(!rows.length)return `<div class=empty>${empty}</div>`;
+  const top=Math.max(...rows.map(r=>r.avg));
+  return `<table><tr><th>Player<th>Games<th>Avg score<th><th>Best score<th>Best tile<th>Reach 512<th>Avg moves<th>Illegal picks<th>ms/move</tr>`+
+   rows.map((r,i)=>`<tr><td><span class=sw style="background:${color[r.id]}"></span>${label(r.id)}<td>${r.games}<td><b>${Math.round(r.avg)}</b>
+    <td><div class="bar ${i==0?'best':''}"><i style="width:${top?r.avg/top*100:0}%"></i></div><td>${r.best}<td>${r.tile}<td>${Math.round(r.r512*100)}%<td>${Math.round(r.moves)}<td>${(r.ill*100).toFixed(1)}%<td>${Math.round(r.ms)}</tr>`).join('')+`</table>`;
+}
+function renderRun(){$('runTbl').innerHTML=table(summarize(games.filter(g=>g.over).map(g=>({model:g.model,score:g.score,best_tile:Math.max(...g.grid.flat()),moves:g.moves,ms_per_move:g.moves?Math.round(g.ms/g.moves):0,illegal_picks:g.illegal}))),'No finished games yet.')}
+function renderAll(){
+  renderRun();
+  $('allTbl').innerHTML=table(summarize(saved),'No saved games yet.');
+  const top=[...saved].sort((a,b)=>b.score-a.score).slice(0,10);
+  $('hi').innerHTML=top.length?`<table><tr><th>#<th>Player<th>Score<th>Tile<th>Moves</tr>`+top.map((r,i)=>`<tr><td>${i+1}<td><span class=sw style="background:${color[r.model]||'#999'}"></span>${label(r.model)}<td><b>${r.score}</b><td>${r.best_tile}<td>${r.moves}</tr>`).join('')+`</table>`:'<div class=empty>No saved games yet.</div>';
+}
+
+$('start').onclick=start;
+$('stop').onclick=()=>{stopFlag=true};
+$('clear').onclick=()=>{if(!running){games=[];$('games').innerHTML='<div class=empty>Boards cleared.</div>';renderAll()}};
+init();
+</script>
+</html>

@@ -1,0 +1,88 @@
+:root{--bg:#faf8ef;--fg:#5b534b;--panel:#fff;--line:#e6dfd2;--accent:#8f7a66;--pick:#f67c5f;--muted:#948b80}
+@media (prefers-color-scheme:dark){:root{--bg:#1f1c19;--fg:#e9e2d8;--panel:#2a2622;--line:#3a352f;--accent:#b59b84;--muted:#a0968a}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;padding:0 16px 60px}
+main{max-width:1200px;margin:0 auto}
+nav{max-width:1200px;margin:0 auto;padding:14px 0 6px;display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center}
+nav .games,nav .modes{display:flex;gap:6px;align-items:center}
+nav b{margin-right:8px;font-size:15px}
+nav a{padding:6px 12px;border-radius:6px;text-decoration:none;color:var(--muted);font-size:14px}
+nav a.on{background:var(--accent);color:#fff}
+nav .games a{font-weight:600}
+nav .modes a{font-size:13px;border:1px solid var(--line)}
+nav .modes a.on{border-color:var(--accent)}
+h1{margin:8px 0 4px;font-size:24px} h2{font-size:16px;margin:0 0 10px}
+a{color:var(--accent)} .sub{color:var(--muted);margin:0 0 16px;font-size:14px}
+.panel{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:16px}
+.ctl{display:flex;flex-wrap:wrap;gap:16px;align-items:center}
+.ctl label{display:flex;gap:6px;align-items:center;font-size:14px}
+label.off{opacity:.5} label small{color:var(--muted)}
+input[type=number],select{padding:5px 8px;border:1px solid var(--line);border-radius:5px;background:var(--bg);color:var(--fg);font-size:14px}
+input[type=number]{width:60px}
+button{padding:8px 16px;border:0;border-radius:6px;background:var(--accent);color:#fff;font-size:14px;cursor:pointer}
+button.ghost{background:transparent;color:var(--accent);border:1px solid var(--accent)}
+button:disabled{opacity:.5;cursor:default}
+table{width:100%;border-collapse:collapse;font-size:14px}
+th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left} th{color:var(--muted);font-weight:500;font-size:12px}
+.tbl{overflow-x:auto}
+.cols{display:grid;grid-template-columns:2fr 1fr;gap:16px} @media(max-width:900px){.cols,.play{grid-template-columns:1fr!important}}
+.bar{height:10px;background:var(--line);border-radius:5px;overflow:hidden;min-width:80px}.bar i{display:block;height:100%;background:var(--accent)}
+.bar.best i,.bar.pick i{background:var(--pick)}
+.sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
+.empty{color:var(--muted);font-size:14px;padding:6px 0}
+.mini{display:grid;grid-template-columns:repeat(4,1fr);gap:3px;background:#bbada0;padding:3px;border-radius:5px}
+.mini div{aspect-ratio:1;border-radius:3px;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700}
+.mini.big{gap:8px;padding:8px;border-radius:8px;max-width:440px}
+.mini.big div{font-size:clamp(18px,5vw,32px);border-radius:6px}
+.stats{display:flex;gap:24px;margin:12px 0;font-size:14px;color:var(--muted)} .stats b{display:block;font-size:22px;color:var(--fg)}
+pre{font-size:11px;white-space:pre-wrap;background:var(--bg);border:1px solid var(--line);padding:8px;border-radius:6px;margin:0}
+.pr{margin-bottom:8px;font-size:14px}
+.err{color:#d9534f;font-size:13px}
+
+/* Dino Run track */
+.track{position:relative;height:64px;background:var(--bg);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.track.big{height:160px;max-width:640px}
+.track .ground{position:absolute;left:0;right:0;bottom:10px;height:2px;background:var(--line)}
+.track.big .ground{bottom:24px}
+.track .dino{position:absolute;left:12px;bottom:10px;font-size:20px;line-height:1;transition:transform .15s ease-out}
+.track.big .dino{left:40px;bottom:24px;font-size:44px}
+.track .dino.jump{transform:translateY(-22px)}
+.track.big .dino.jump{transform:translateY(-56px)}
+.track .dino.duck{transform:scaleY(.55) translateY(4px);transform-origin:bottom}
+.track .obs{position:absolute;left:100%;font-size:18px;line-height:1;transition:left linear}
+.track.big .obs{font-size:38px}
+.track .obs.o-cactus{bottom:10px} .track.big .obs.o-cactus{bottom:24px}
+.track .obs.o-bird_low{bottom:24px} .track.big .obs.o-bird_low{bottom:70px}
+.track .obs.o-bird_high{bottom:42px} .track.big .obs.o-bird_high{bottom:112px}
+.track.crash{background:#e9635a22}
+.legend{font-size:12px;color:var(--muted);margin:6px 0 0}
+
+/* Chess */
+.chessboard{position:relative;display:grid;grid-template-columns:repeat(8,1fr);width:100%;max-width:340px;border:1px solid var(--line);border-radius:6px;overflow:hidden;transition:outline-color .15s}
+.chessboard.big{max-width:600px}
+.chessboard div{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;font-size:22px;background:#e9dfc9;color:#2b2620}
+.chessboard.big div{font-size:clamp(20px,5.5vw,48px)}
+.chessboard div.dark{background:#a98d6a}
+.chessboard div.black-piece{color:#1a1712}
+.chessboard div.white-piece{color:#faf8f2;text-shadow:0 0 1px #000,0 0 2px #000}
+/* move hint: shown on the current board while a model is deciding, before its move is known */
+.chessboard div.hint::after{content:'';position:absolute;width:32%;height:32%;border-radius:50%;background:rgba(80,160,90,.55)}
+.chessboard div.hint.capture-hint::after{width:100%;height:100%;border-radius:0;background:transparent;box-shadow:inset 0 0 0 4px rgba(217,83,79,.65)}
+/* last move played */
+.chessboard div.from-sq{box-shadow:inset 0 0 0 3px rgba(143,122,102,.85)}
+.chessboard div.to-sq{box-shadow:inset 0 0 0 3px var(--pick)}
+/* checkmate: the whole board and the mated king's square */
+.chessboard.mate{outline:4px solid #d9534f;outline-offset:2px}
+.chessboard div.mate-sq{background:#d9534f !important}
+.legend-row{display:flex;gap:14px;align-items:center;font-size:12px;color:var(--muted);margin:8px 0}
+.legend-row .chip{display:inline-flex;align-items:center;gap:5px}
+.legend-row .chip i{width:14px;height:14px;border-radius:3px;display:inline-block;border:1px solid var(--line)}
+.vs{display:flex;justify-content:space-between;align-items:center;font-size:12px;margin-bottom:6px;gap:6px}
+.vs .side{display:flex;align-items:center;gap:5px;min-width:0}
+.vs .side small{color:var(--muted);font-weight:400}
+.vs .side b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.vs .side.turn{font-weight:700;color:var(--accent)}
+.vs .side.turn small{color:var(--accent)}
+.moves{font-size:12px;color:var(--muted);max-height:120px;overflow:auto;line-height:1.6}
+.moves b{color:var(--fg)}

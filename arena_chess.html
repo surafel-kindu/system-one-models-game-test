@@ -1,0 +1,194 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chess Arena</title>
+<link rel=stylesheet href="/style.css">
+<style>
+#games{display:grid;grid-template-columns:repeat(2,1fr);gap:16px}
+@media(max-width:700px){#games{grid-template-columns:1fr}}
+.g{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px}
+.g.done{opacity:.75}
+.g .f{font-size:11px;color:var(--muted);margin-top:6px}
+</style>
+<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a class=on href="/chess">Chess</a></div>
+<div class=modes><a class=on href="/chess">Arena</a><a href="/chess/play">Match</a><a href="/traces">Traces</a></div></nav>
+<main>
+<h1>Chess Arena</h1>
+<p class=sub>Every pair of selected players plays each other (alternating colors), and you get a win/loss/draw leaderboard.</p>
+<p class=legend>Each side sees the full board, whose pieces are its own, and which way it moves. To keep the
+text short, it picks from the top ~14 legal moves ranked by capture value, checks, and center control —
+not literally every legal move (see the README). A move is real chess: castling, en passant, promotion
+and checkmate all apply.</p>
+
+<div class=panel>
+  <div class=ctl>
+    <span id=players>Loading players…</span>
+    <label>Matches per pairing <input type=number id=n value=1 min=1 max=10></label>
+    <button id=start>Start</button><button id=stop class=ghost disabled>Stop</button>
+    <button id=clear class=ghost title="Remove board cards from the page (saved results stay)">Clear boards</button>
+    <span id=status class=sub style="margin:0"></span>
+  </div>
+</div>
+
+<div class=panel><h2>Live matches</h2>
+  <div class=legend-row>
+    <span class=chip><i style="background:rgba(80,160,90,.55);border-radius:50%"></i> considering</span>
+    <span class=chip><i style="background:transparent;box-shadow:inset 0 0 0 2px rgba(217,83,79,.65)"></i> considering a capture</span>
+    <span class=chip><i style="background:var(--pick)"></i> move just played</span>
+    <span class=chip><i style="background:#d9534f"></i> checkmate</span>
+  </div>
+  <div id=games><div class=empty>Pick at least two players and press Start.</div></div>
+</div>
+
+<div class=cols>
+  <div>
+    <div class=panel><h2>This run</h2><div class=tbl id=runTbl><div class=empty>No finished matches yet.</div></div></div>
+    <div class=panel><h2>All time (saved)</h2><div class=tbl id=allTbl><div class=empty>No saved matches yet.</div></div></div>
+  </div>
+  <div class=panel><h2>Recent results</h2><div class=tbl id=hi><div class=empty>No saved matches yet.</div></div></div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const PAL=['#f67c5f','#4c8dd6','#5aa469','#c98bd3','#e0a93b','#3fb8b0','#a0785a','#d9628b'];
+const GLYPH={p:'♟',n:'♞',b:'♝',r:'♜',q:'♛',k:'♚',P:'♙',N:'♘',B:'♗',R:'♖',Q:'♕',K:'♔'};
+const MAX_PLIES=200;
+let models=[],color={},games=[],running=false,stopFlag=false,saved=[];
+
+const label=id=>(models.find(m=>m.id==id)||{label:id}).label;
+function boardHtml(fen,big){
+  const rows=fen.split(' ')[0].split('/');
+  let html='';
+  rows.forEach((row,r)=>{
+    let c=0;
+    for(const ch of row){
+      if(/[1-8]/.test(ch)){for(let i=0;i<+ch;i++){html+=cell(r,c,'');c++}}
+      else{html+=cell(r,c,ch);c++}
+    }
+  });
+  return `<div class="chessboard${big?' big':''}">${html}</div>`;
+}
+function cell(r,c,ch){
+  const dark=(r+c)%2==1;
+  const cls=ch?(ch==ch.toUpperCase()?'white-piece':'black-piece'):'';
+  const sq=String.fromCharCode(97+c)+(8-r);
+  return `<div data-sq="${sq}" class="${dark?'dark':''} ${cls}">${ch?GLYPH[ch]:''}</div>`;
+}
+function sqEl(g,sq){return g.el.querySelector(`.bd [data-sq="${sq}"]`)}
+function showHints(g,moves){
+  moves.forEach(m=>{const el=sqEl(g,m.to);if(!el)return;el.classList.add('hint');if(m.capture)el.classList.add('capture-hint')});
+}
+function markLastMove(g,uci){
+  if(!uci)return;
+  const from=sqEl(g,uci.slice(0,2)),to=sqEl(g,uci.slice(2,4));
+  if(from)from.classList.add('from-sq');if(to)to.classList.add('to-sq');
+}
+function markMate(g,sq){
+  g.el.querySelector('.bd .chessboard').classList.add('mate');
+  const el=sqEl(g,sq);if(el)el.classList.add('mate-sq');
+}
+
+async function init(){
+  models=await (await fetch('/api/chess/models')).json();
+  models.forEach((m,i)=>color[m.id]=PAL[i%PAL.length]);
+  $('players').innerHTML=models.map(m=>`<label class="${m.available?'':'off'}" title="${m.reason||''}"><input type=checkbox value="${m.id}" ${m.available&&!m.baseline?'checked':''} ${m.available?'':'disabled'}><span class=sw style="background:${color[m.id]}"></span>${m.label}${m.available?'':` <small>(${m.reason})</small>`}</label>`).join(' ');
+  await loadSaved();
+}
+async function loadSaved(){saved=await (await fetch('/api/chess/results')).json();renderAll()}
+
+function mkGame(white,black){
+  const el=document.createElement('div');el.className='g';
+  el.innerHTML=`<div class=vs><span class="side w"><small>White</small><span class=sw style="background:${color[white]}"></span><b>${label(white)}</b></span>`+
+    `<span class=sub>vs</span><span class="side b"><b>${label(black)}</b><span class=sw style="background:${color[black]}"></span><small>Black</small></span></div>`+
+    `<div class=bd></div><div class=f>ply 0 · <span class=st>starting…</span></div>`;
+  $('games').append(el);
+  return {white,black,el,ms:0,over:false,ply:0};
+}
+function draw(g,fen,turn){
+  g.el.querySelector('.bd').innerHTML=boardHtml(fen,false);
+  g.el.querySelector('.side.w').classList.toggle('turn',turn=='white'&&!g.over);
+  g.el.querySelector('.side.b').classList.toggle('turn',turn=='black'&&!g.over);
+}
+async function play(g){
+  let r;try{r=await (await fetch('/api/chess/matches',{method:'POST',body:JSON.stringify({white:g.white,black:g.black})})).json()}catch(e){g.err=String(e);}
+  if(g.err||r.error){g.err=g.err||r.error;finish(g);return}
+  g.match_id=r.match_id;draw(g,r.fen,r.turn);
+  while(!stopFlag&&!g.over){
+    try{  // show which destinations are being weighed, on the board as it looks right now
+      const c=await (await fetch(`/api/chess/matches/${g.match_id}/candidates`)).json();
+      showHints(g,c.moves||[]);
+    }catch(e){}
+    const t=performance.now();
+    let s;try{s=await (await fetch(`/api/chess/matches/${g.match_id}/step`,{method:'POST'})).json()}catch(e){g.err=String(e);break}
+    g.ms+=performance.now()-t;
+    if(s.error){g.err=s.error;break}
+    g.ply=s.ply||g.ply;draw(g,s.fen,s.turn);markLastMove(g,s.move);
+    g.el.querySelector('.f').innerHTML=`ply ${g.ply} · <span class=st>${s.by?label(g[s.by]):''} played ${s.san||''}</span>`;
+    if(s.over){
+      g.over=true;g.result=s.result;g.reason=s.reason;
+      if(s.reason=='checkmate'&&s.mate_square)markMate(g,s.mate_square);
+      break;
+    }
+    if(g.ply>=MAX_PLIES){g.over=true;g.result='1/2-1/2';g.reason='ply_limit';break}
+  }
+  finish(g);
+}
+async function finish(g){
+  g.el.classList.add('done');
+  if(g.err){
+    g.el.querySelector('.f').innerHTML=`<span class="st err">error: ${g.err}</span>`;
+  } else if(g.over){
+    g.el.querySelector('.f').innerHTML=`ply ${g.ply} · <span class=st>${g.result} (${(g.reason||'').replace(/_/g,' ')})</span>`;
+    const rec={white:g.white,black:g.black,result:g.result,reason:g.reason,plies:g.ply,ms_per_move:g.ply?Math.round(g.ms/g.ply):0};
+    await fetch('/api/chess/results',{method:'POST',body:JSON.stringify(rec)});saved.push(rec);renderAll();
+  } else {
+    g.el.querySelector('.f').innerHTML=`ply ${g.ply} · <span class=st>stopped</span>`;
+  }
+}
+function pairs(list){const out=[];for(let i=0;i<list.length;i++)for(let j=i+1;j<list.length;j++)out.push([list[i],list[j]]);return out}
+async function start(){
+  const picked=[...document.querySelectorAll('#players input:checked')].map(i=>i.value);
+  if(picked.length<2||running)return;
+  const n=Math.max(1,Math.min(10,+$('n').value||1));
+  running=true;stopFlag=false;$('start').disabled=true;$('stop').disabled=false;
+  games=[];$('games').innerHTML='';
+  pairs(picked).forEach(([a,b])=>{for(let i=0;i<n;i++)games.push(i%2==0?mkGame(a,b):mkGame(b,a))});
+  const tick=setInterval(()=>{const d=games.filter(g=>g.over||g.err).length;$('status').textContent=`${d}/${games.length} finished`;renderRun()},500);
+  await Promise.all(games.map(play));
+  clearInterval(tick);running=false;$('start').disabled=false;$('stop').disabled=true;
+  $('status').textContent=stopFlag?'stopped (unfinished matches are not saved)':'all matches finished';renderAll();
+}
+
+function summarize(rows){
+  const by={};
+  rows.forEach(r=>{
+    (by[r.white]??=[]).push({win:r.result=='1-0',loss:r.result=='0-1',draw:r.result=='1/2-1/2',plies:r.plies});
+    (by[r.black]??=[]).push({win:r.result=='0-1',loss:r.result=='1-0',draw:r.result=='1/2-1/2',plies:r.plies});
+  });
+  return Object.entries(by).map(([id,rs])=>{
+    const w=rs.filter(x=>x.win).length,l=rs.filter(x=>x.loss).length,d=rs.filter(x=>x.draw).length;
+    return {id,games:rs.length,w,l,d,rate:(w+0.5*d)/rs.length,plies:rs.reduce((a,x)=>a+x.plies,0)/rs.length};
+  }).sort((a,b)=>b.rate-a.rate);
+}
+function table(rows,empty){
+  if(!rows.length)return `<div class=empty>${empty}</div>`;
+  return `<table><tr><th>Player<th>Games<th>W<th>L<th>D<th>Win rate<th><th>Avg plies</tr>`+
+   rows.map(r=>`<tr><td><span class=sw style="background:${color[r.id]||'#999'}"></span>${label(r.id)}<td>${r.games}<td>${r.w}<td>${r.l}<td>${r.d}<td><b>${Math.round(r.rate*100)}%</b>
+    <td><div class=bar><i style="width:${r.rate*100}%"></i></div><td>${Math.round(r.plies)}</tr>`).join('')+`</table>`;
+}
+function renderRun(){$('runTbl').innerHTML=table(summarize(games.filter(g=>g.over&&!g.err).map(g=>({white:g.white,black:g.black,result:g.result,reason:g.reason,plies:g.ply}))),'No finished matches yet.')}
+function renderAll(){
+  renderRun();
+  $('allTbl').innerHTML=table(summarize(saved),'No saved matches yet.');
+  const recent=[...saved].slice(-10).reverse();
+  $('hi').innerHTML=recent.length?`<table><tr><th>White<th>Black<th>Result<th>Why<th>Plies</tr>`+recent.map(r=>`<tr><td><span class=sw style="background:${color[r.white]||'#999'}"></span>${label(r.white)}<td><span class=sw style="background:${color[r.black]||'#999'}"></span>${label(r.black)}<td><b>${r.result}</b><td>${(r.reason||'').replace(/_/g,' ')}<td>${r.plies}</tr>`).join('')+`</table>`:'<div class=empty>No saved matches yet.</div>';
+}
+
+$('start').onclick=start;
+$('stop').onclick=()=>{stopFlag=true};
+$('clear').onclick=()=>{if(!running){games=[];$('games').innerHTML='<div class=empty>Boards cleared.</div>';renderAll()}};
+init();
+</script>
+</html>

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Traces</title>
+<link rel=stylesheet href="/style.css">
+<style>
+.trace{background:var(--panel);border:1px solid var(--line);border-radius:8px;margin-bottom:8px;overflow:hidden}
+.trace .head{display:grid;grid-template-columns:130px 70px 110px 100px 70px 1fr 60px;gap:10px;align-items:center;padding:8px 12px;cursor:pointer;font-size:12px}
+.trace .head:hover{background:var(--bg)}
+.trace .head .sum{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}
+.trace .head .gid{font-family:monospace;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.trace .head .err{color:#d9534f;font-weight:600}
+.trace .body{display:none;grid-template-columns:1fr 1fr;gap:10px;padding:0 12px 12px}
+.trace.open .body{display:grid}
+@media(max-width:700px){.trace .head{grid-template-columns:1fr 1fr;grid-template-areas:"time game" "model gid" "lat sum" "sum sum";font-size:11px}.trace .body{grid-template-columns:1fr}}
+.trace pre{max-height:280px}
+.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;background:var(--bg);border:1px solid var(--line)}
+.chev{color:var(--muted);text-align:right}
+#list .empty{padding:20px 0}
+</style>
+<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a></div>
+<div class=modes><a class=on href="/traces">Traces</a></div></nav>
+<main>
+<h1>Traces</h1>
+<p class=sub>Every model decision, across every game: the exact request and response, filterable by game, model, and game id.</p>
+
+<div class=panel>
+  <div class=ctl>
+    <label>Game <select id=fgame><option value="">All</option></select></label>
+    <label>Model <select id=fmodel><option value="">All</option></select></label>
+    <label>Game ID <input id=fgid placeholder="partial match" size=14></label>
+    <label>Search <input id=fq placeholder="text in request/response" size=18></label>
+    <label>Limit <input type=number id=flimit value=100 min=1 max=1000 style="width:70px"></label>
+    <button id=refresh>Refresh</button>
+    <label><input type=checkbox id=live checked> Live</label>
+    <span id=count class=sub style="margin:0"></span>
+  </div>
+</div>
+
+<div id=list><div class=empty>Loading…</div></div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const GAMES=['2048','dino','chess'];
+let modelLabels={},busy=false;
+
+function fmtTime(ts){const d=new Date(ts);return d.toLocaleTimeString()+'.'+String(d.getMilliseconds()).padStart(3,'0')}
+function summary(t){
+  const r=t.response||{};
+  if(r.error)return {cls:'err',text:'error: '+r.error};
+  if(t.game=='2048')return {text:(r.move||'–')+(r.illegal_pick?' (was illegal, replayed)':'')};
+  if(t.game=='dino')return {text:r.action||'–'};
+  if(t.game=='chess')return {text:(t.request&&t.request.by?t.request.by+': ':'')+(r.san||r.move||'–')+(r.over?` — ${r.result} (${(r.reason||'').replace(/_/g,' ')})`:'')};
+  return {text:''};
+}
+function label(id){return modelLabels[id]||id||'–'}
+function row(t){
+  const s=summary(t);
+  const el=document.createElement('div');el.className='trace';
+  el.innerHTML=`<div class=head>
+      <span>${fmtTime(t.ts)}</span>
+      <span class=tag>${t.game}</span>
+      <span>${label(t.model)}</span>
+      <span class=gid title="${t.game_id||''}">${(t.game_id||'–').slice(0,10)}</span>
+      <span>${t.latency_ms}ms</span>
+      <span class="sum ${s.cls||''}">${s.text}</span>
+      <span class=chev>▸</span>
+    </div>
+    <div class=body>
+      <div><h2 style="font-size:13px;margin:0 0 4px">Request</h2><pre>${esc(JSON.stringify(t.request,null,2))}</pre></div>
+      <div><h2 style="font-size:13px;margin:0 0 4px">Response</h2><pre>${esc(JSON.stringify(t.response,null,2))}</pre></div>
+    </div>`;
+  el.querySelector('.head').onclick=()=>el.classList.toggle('open');
+  return el;
+}
+function esc(s){return (s||'').replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}
+
+async function loadModels(){
+  const opts={};
+  for(const g of GAMES){
+    try{
+      const ms=await (await fetch(`/api/${g}/models`)).json();
+      ms.forEach(m=>{opts[m.id]=m.label;modelLabels[m.id]=m.label});
+    }catch(e){}
+  }
+  $('fmodel').innerHTML='<option value="">All</option>'+Object.entries(opts).map(([id,l])=>`<option value="${id}">${l}</option>`).join('');
+  $('fgame').innerHTML='<option value="">All</option>'+GAMES.map(g=>`<option value="${g}">${g}</option>`).join('');
+}
+async function load(){
+  if(busy)return;busy=true;
+  const p=new URLSearchParams();
+  if($('fgame').value)p.set('game',$('fgame').value);
+  if($('fmodel').value)p.set('model',$('fmodel').value);
+  if($('fgid').value)p.set('game_id',$('fgid').value);
+  if($('fq').value)p.set('q',$('fq').value);
+  p.set('limit',$('flimit').value||100);
+  let data=[];try{data=await (await fetch('/api/traces?'+p)).json()}catch(e){}
+  busy=false;
+  const openIds=new Set([...document.querySelectorAll('.trace.open')].map(e=>e.dataset.id));
+  $('list').innerHTML='';
+  if(!data.length){$('list').innerHTML='<div class=empty>No traces match these filters yet. Play a game, or loosen the filters.</div>';$('count').textContent='';return}
+  data.forEach(t=>{const el=row(t);el.dataset.id=t.id;if(openIds.has(t.id))el.classList.add('open');$('list').append(el)});
+  $('count').textContent=`${data.length} shown`;
+}
+['fgame','fmodel'].forEach(id=>$(id).onchange=load);
+['fgid','fq','flimit'].forEach(id=>$(id).oninput=()=>{clearTimeout(window._deb);window._deb=setTimeout(load,300)});
+$('refresh').onclick=load;
+setInterval(()=>{if($('live').checked)load()},4000);
+loadModels().then(load);
+</script>
+</html>

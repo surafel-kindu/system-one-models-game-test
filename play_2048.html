@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>2048 Single Game</title>
+<link rel=stylesheet href="/style.css">
+<style>.play{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}</style>
+<nav><div class=games><b>2048 · AI</b><a class=on href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a></div><div class=modes><a href="/2048">Arena</a><a class=on href="/2048/play">Single game</a><a href="/traces">Traces</a></div></nav>
+<main>
+<h1>Single game</h1>
+<p class=sub>Watch one model play move by move and see exactly what it was asked and how confident it was.</p>
+
+<div class=panel>
+  <div class=ctl>
+    <label>Player <select id=model></select></label>
+    <button id=step>Step</button><button id=auto>Auto-play</button><button id=reset class=ghost>New game</button>
+    <span id=msg class=sub style="margin:0"></span>
+  </div>
+</div>
+
+<div class=play>
+  <div class=panel>
+    <h2>Board</h2>
+    <div class="mini big" id=board></div>
+    <div class=stats><div>Score<b id=score>0</b></div><div>Moves<b id=moves>0</b></div><div>Best tile<b id=best>0</b></div><div>Latency<b id=lat>–</b></div></div>
+  </div>
+  <div>
+    <div class=panel><h2>Model's decision</h2><div id=probs class=empty>Press Step or Auto-play.</div></div>
+    <div class=panel><h2>State sent to the model</h2><pre id=state>–</pre></div>
+  </div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const TILE={0:'#cdc1b4',2:'#eee4da',4:'#ede0c8',8:'#f2b179',16:'#f59563',32:'#f67c5f',64:'#f65e3b',128:'#edcf72',256:'#edcc61',512:'#edc850',1024:'#edc53f',2048:'#edc22e'};
+let g,score,moves,gameId,auto=false,busy=false,over=false;
+const newId=()=>(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));
+function slide(r){const t=r.filter(x=>x),o=[];let gain=0;for(let i=0;i<t.length;i++){if(t[i]==t[i+1]){o.push(t[i]*2);gain+=t[i]*2;i++}else o.push(t[i])}while(o.length<4)o.push(0);return[o,gain]}
+function mv(gr,d){let x=gr.map(r=>r.slice());if(d=='up'||d=='down')x=x[0].map((_,c)=>x.map(r=>r[c]));if(d=='right'||d=='down')x=x.map(r=>r.reverse());let gain=0;x=x.map(r=>{const[a,b]=slide(r);gain+=b;return a});if(d=='right'||d=='down')x=x.map(r=>r.reverse());if(d=='up'||d=='down')x=x[0].map((_,c)=>x.map(r=>r[c]));return[x,gain]}
+function spawn(gr){const e=[];gr.forEach((r,i)=>r.forEach((v,j)=>{if(!v)e.push([i,j])}));if(!e.length)return;const[i,j]=e[Math.random()*e.length|0];gr[i][j]=Math.random()<.9?2:4}
+function reset(){g=[...Array(4)].map(()=>[0,0,0,0]);spawn(g);spawn(g);score=moves=0;gameId=newId();over=false;$('msg').textContent='';draw()}
+function draw(){
+  $('board').innerHTML=g.flat().map(v=>`<div style="background:${TILE[v]||'#3c3a32'};color:${v>4?'#fff':'#776e65'}">${v||''}</div>`).join('');
+  $('score').textContent=score;$('moves').textContent=moves;$('best').textContent=Math.max(...g.flat());
+}
+function stop(){auto=false;$('auto').textContent='Auto-play'}
+async function step(){
+  if(busy||over)return;busy=true;const t=performance.now();
+  let r;try{r=await (await fetch('/api/2048/decide',{method:'POST',body:JSON.stringify({grid:g,model:$('model').value,game_id:gameId})})).json()}catch(e){r={error:String(e)}}
+  busy=false;
+  if(r.error){$('msg').innerHTML=`<span class=err>${r.error}</span>`;stop();return}
+  $('lat').textContent=Math.round(performance.now()-t)+' ms';
+  if(!r.move){over=true;stop();$('msg').textContent='Game over';$('probs').textContent='Game over';return}
+  const ps=r.probs;
+  $('probs').innerHTML=Object.entries(ps).map(([k,v])=>`<div class=pr>${k} · ${(v*100).toFixed(0)}%${k==r.move?' ← chosen':''}<div class="bar ${k==r.move?'pick':''}"><i style="width:${v*100}%"></i></div></div>`).join('')||`<b>${r.move}</b>`;
+  if(r.illegal_pick)$('msg').innerHTML='<span class=err>Model picked an illegal move; best legal option played instead.</span>';else $('msg').textContent='';
+  $('state').textContent=r.state;
+  const[n,gain]=mv(g,r.move);g=n;score+=gain;moves++;spawn(g);draw();
+}
+async function loop(){while(auto&&!over)await step();stop()}
+$('step').onclick=step;
+$('auto').onclick=()=>{auto=!auto;$('auto').textContent=auto?'Pause':'Auto-play';if(auto)loop()};
+$('reset').onclick=()=>{stop();reset()};
+$('model').onchange=()=>{stop();reset()};
+fetch('/api/2048/models').then(r=>r.json()).then(ms=>{
+  $('model').innerHTML=ms.map(m=>`<option value=${m.id} ${m.available?'':'disabled'}>${m.label}${m.available?'':' — '+m.reason}</option>`).join('');
+  $('model').value=(ms.find(m=>m.available&&!m.baseline)||ms[0]).id;
+});
+reset();
+</script>
+</html>

@@ -1,0 +1,141 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Chess — Match</title>
+<link rel=stylesheet href="/style.css">
+<style>.play{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}</style>
+<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a class=on href="/chess">Chess</a></div>
+<div class=modes><a href="/chess">Arena</a><a class=on href="/chess/play">Match</a><a href="/traces">Traces</a></div></nav>
+<main>
+<h1>Chess — one match, two models</h1>
+<p class=sub>Pick who plays White and who plays Black, then watch them play each other move by move.</p>
+<p class=legend>Each side sees the full board, whose pieces are its own, and which way it moves, and
+picks from the top ~14 legal moves ranked by capture value, checks and center control (not every
+legal move — see the README). Castling, en passant, promotion and checkmate all apply.</p>
+
+<div class=panel>
+  <div class=ctl>
+    <label>White <select id=white></select></label>
+    <label>Black <select id=black></select></label>
+    <button id=step>Step</button><button id=auto>Auto-play</button><button id=reset class=ghost>New match</button>
+    <span id=msg class=sub style="margin:0"></span>
+  </div>
+</div>
+
+<div class=play>
+  <div class=panel>
+    <h2>Board</h2>
+    <div class=vs style="margin-bottom:10px">
+      <span class="side w" id=wside><small>White</small><span class=sw style="background:#eee"></span><b id=wname>White</b></span>
+      <span class=sub>vs</span>
+      <span class="side b" id=bside><b id=bname>Black</b><span class=sw style="background:#333"></span><small>Black</small></span>
+    </div>
+    <div class="chessboard big" id=board></div>
+    <div class=legend-row>
+      <span class=chip><i style="background:rgba(80,160,90,.55);border-radius:50%"></i> considering</span>
+      <span class=chip><i style="background:transparent;box-shadow:inset 0 0 0 2px rgba(217,83,79,.65)"></i> considering a capture</span>
+      <span class=chip><i style="background:var(--pick)"></i> move just played</span>
+      <span class=chip><i style="background:#d9534f"></i> checkmate</span>
+    </div>
+    <div class=stats><div>Ply<b id=ply>0</b></div><div>Turn<b id=turn>White</b></div><div>Latency<b id=lat>–</b></div></div>
+  </div>
+  <div>
+    <div class=panel><h2>Mover's decision</h2><div id=probs class=empty>Press Step or Auto-play.</div></div>
+    <div class=panel><h2>State sent to the mover</h2><pre id=state>–</pre></div>
+    <div class=panel><h2>Moves</h2><div class=moves id=history>–</div></div>
+  </div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const GLYPH={p:'♟',n:'♞',b:'♝',r:'♜',q:'♛',k:'♚',P:'♙',N:'♘',B:'♗',R:'♖',Q:'♕',K:'♔'};
+let models=[],matchId=null,history=[],over=false,auto=false,busy=false;
+
+function boardHtml(fen){
+  const rows=fen.split(' ')[0].split('/');
+  let html='';
+  rows.forEach((row,r)=>{
+    let c=0;
+    for(const ch of row){
+      if(/[1-8]/.test(ch)){for(let i=0;i<+ch;i++){html+=cell(r,c,'');c++}}
+      else{html+=cell(r,c,ch);c++}
+    }
+  });
+  return html;
+}
+function cell(r,c,ch){
+  const dark=(r+c)%2==1;
+  const cls=ch?(ch==ch.toUpperCase()?'white-piece':'black-piece'):'';
+  const sq=String.fromCharCode(97+c)+(8-r);
+  return `<div data-sq="${sq}" class="${dark?'dark':''} ${cls}">${ch?GLYPH[ch]:''}</div>`;
+}
+function sqEl(sq){return $('board').querySelector(`[data-sq="${sq}"]`)}
+function showHints(moves){
+  moves.forEach(m=>{const el=sqEl(m.to);if(!el)return;el.classList.add('hint');if(m.capture)el.classList.add('capture-hint')});
+}
+function markLastMove(uci){
+  if(!uci)return;
+  const from=sqEl(uci.slice(0,2)),to=sqEl(uci.slice(2,4));
+  if(from)from.classList.add('from-sq');if(to)to.classList.add('to-sq');
+}
+function markMate(sq){
+  $('board').classList.add('mate');
+  const el=sqEl(sq);if(el)el.classList.add('mate-sq');
+}
+function label(id){return (models.find(m=>m.id==id)||{label:id}).label}
+function stop(){auto=false;$('auto').textContent='Auto-play'}
+function drawTurn(turn){
+  $('turn').textContent=turn=='white'?'White':'Black';
+  $('wside').classList.toggle('turn',turn=='white'&&!over);
+  $('bside').classList.toggle('turn',turn=='black'&&!over);
+}
+
+async function reset(){
+  stop();over=false;history=[];$('msg').textContent='';$('probs').innerHTML='<div class=empty>Press Step or Auto-play.</div>';$('state').textContent='–';
+  $('board').classList.remove('mate');
+  $('wname').textContent=label($('white').value);$('bname').textContent=label($('black').value);
+  const r=await (await fetch('/api/chess/matches',{method:'POST',body:JSON.stringify({white:$('white').value,black:$('black').value})})).json();
+  if(r.error){$('msg').innerHTML=`<span class=err>${r.error}</span>`;return}
+  matchId=r.match_id;$('board').innerHTML=boardHtml(r.fen);$('ply').textContent='0';$('history').textContent='–';drawTurn(r.turn);
+}
+async function step(){
+  if(busy||over||!matchId)return;busy=true;
+  try{  // show which destinations are being weighed, on the board as it looks right now
+    const c=await (await fetch(`/api/chess/matches/${matchId}/candidates`)).json();
+    showHints(c.moves||[]);
+  }catch(e){}
+  const t=performance.now();
+  let r;try{r=await (await fetch(`/api/chess/matches/${matchId}/step`,{method:'POST'})).json()}catch(e){r={error:String(e)}}
+  busy=false;
+  if(r.error){$('msg').innerHTML=`<span class=err>${r.error}</span>`;stop();return}
+  $('lat').textContent=Math.round(performance.now()-t)+' ms';
+  const ps=r.probs||{};
+  $('probs').innerHTML=Object.keys(ps).length?Object.entries(ps).sort((a,b)=>b[1]-a[1]).slice(0,8).map(([k,v])=>`<div class=pr>${k} · ${(v*100).toFixed(0)}%${k==r.move?' ← chosen':''}<div class="bar ${k==r.move?'pick':''}"><i style="width:${v*100}%"></i></div></div>`).join('')
+    :`<b>${r.san||''}</b> (no per-option probabilities from this baseline)`;
+  $('state').textContent=r.state||'–';
+  $('board').innerHTML=boardHtml(r.fen);$('ply').textContent=r.ply??history.length;
+  markLastMove(r.move);
+  if(r.san){history.push(r.san);$('history').innerHTML=history.map((m,i)=>i%2==0?`<b>${i/2+1}.</b> ${m}`:`${m}`).join(' ')}
+  drawTurn(r.turn);
+  if(r.over){over=true;stop();$('msg').innerHTML=`<b>${r.result}</b> — ${(r.reason||'').replace(/_/g,' ')}`;
+    if(r.reason=='checkmate'&&r.mate_square)markMate(r.mate_square);
+    fetch('/api/chess/results',{method:'POST',body:JSON.stringify({white:$('white').value,black:$('black').value,result:r.result,reason:r.reason,plies:r.ply})});
+  }
+}
+async function loop(){while(auto&&!over)await step();stop()}
+$('step').onclick=step;
+$('auto').onclick=()=>{auto=!auto;$('auto').textContent=auto?'Pause':'Auto-play';if(auto)loop()};
+$('reset').onclick=reset;
+$('white').onchange=reset;$('black').onchange=reset;
+fetch('/api/chess/models').then(r=>r.json()).then(async ms=>{
+  models=ms;
+  const opts=ms.map(m=>`<option value=${m.id} ${m.available?'':'disabled'}>${m.label}${m.available?'':' — '+m.reason}</option>`).join('');
+  $('white').innerHTML=opts;$('black').innerHTML=opts;
+  const avail=ms.filter(m=>m.available&&!m.baseline);
+  $('white').value=(avail[0]||ms[0]).id;$('black').value=(avail[1]||avail[0]||ms[0]).id;
+  await reset();
+});
+</script>
+</html>

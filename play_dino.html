@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dino Run — Single Game</title>
+<link rel=stylesheet href="/style.css">
+<style>.play{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}</style>
+<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a class=on href="/dino">Dino Run</a><a href="/chess">Chess</a></div>
+<div class=modes><a href="/dino">Arena</a><a class=on href="/dino/play">Single game</a><a href="/traces">Traces</a></div></nav>
+<main>
+<h1>Dino Run — single game</h1>
+<p class=sub>Watch one model react to each obstacle and see exactly what it was asked and how confident it was.</p>
+<p class=legend>Rules: 🌵 cactus needs <b>jump</b> · 🐦 low bird needs <b>duck</b> · 🐦 high bird needs <b>none</b> (run). Any other action is a crash.</p>
+
+<div class=panel>
+  <div class=ctl>
+    <label>Player <select id=model></select></label>
+    <button id=step>Step</button><button id=auto>Auto-play</button><button id=reset class=ghost>New run</button>
+    <span id=msg class=sub style="margin:0"></span>
+  </div>
+</div>
+
+<div class=play>
+  <div class=panel>
+    <h2>Track</h2>
+    <div class="track big" id=track><div class=ground></div><div class=dino id=dino>🦖</div></div>
+    <div class=stats><div>Score<b id=score>0</b></div><div>Cleared<b id=cleared>0</b></div><div>Speed<b id=speed>0</b></div><div>Latency<b id=lat>–</b></div></div>
+  </div>
+  <div>
+    <div class=panel><h2>Model's decision</h2><div id=probs class=empty>Press Step or Auto-play.</div></div>
+    <div class=panel><h2>State sent to the model</h2><pre id=state>–</pre></div>
+  </div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const EMOJI={cactus:'🌵',bird_low:'🐦',bird_high:'🐦'};
+const CORRECT={cactus:'jump',bird_low:'duck',bird_high:'none'};
+const OBSTACLE_CAP=300;
+function speedFor(cleared){return Math.round(Math.min(6+cleared*0.15,18)*10)/10}
+function genObstacle(cleared){const birdP=Math.min(0.2+cleared*0.01,0.7);if(Math.random()>birdP)return 'cactus';return Math.random()<0.5?'bird_low':'bird_high'}
+function resolve(obs,action){return CORRECT[obs]===action}
+
+let state,obstacle,next,gameId,auto=false,busy=false,over=false;
+const newId=()=>(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));
+function reset(){state={score:0,cleared:0,speed:speedFor(0)};obstacle=genObstacle(0);next=genObstacle(1);gameId=newId();over=false;$('msg').textContent='';$('track').classList.remove('crash');$('dino').className='dino';draw()}
+function draw(){$('score').textContent=state.score;$('cleared').textContent=state.cleared;$('speed').textContent=state.speed}
+function stop(){auto=false;$('auto').textContent='Auto-play'}
+function anim(action,cleared){
+  return new Promise(res=>{
+    const track=$('track'),dino=$('dino');
+    const obsEl=document.createElement('div');obsEl.className='obs o-'+obstacle;obsEl.textContent=EMOJI[obstacle];
+    track.append(obsEl);
+    const ms=Math.max(320,1100-state.speed*36);
+    requestAnimationFrame(()=>{obsEl.style.transition=`left ${ms}ms linear`;obsEl.style.left='96px'});
+    setTimeout(()=>{
+      if(action=='jump'||action=='duck')dino.className='dino '+action;
+      setTimeout(()=>{
+        dino.className='dino';
+        if(!cleared){track.classList.add('crash');obsEl.classList.add('crash')}
+        else{obsEl.style.transition='left 220ms linear, opacity 220ms linear';obsEl.style.left='-30px';obsEl.style.opacity='0';setTimeout(()=>obsEl.remove(),240)}
+        res();
+      },260);
+    },ms);
+  });
+}
+async function step(){
+  if(busy||over)return;busy=true;const t=performance.now();
+  let r;try{r=await (await fetch('/api/dino/decide',{method:'POST',body:JSON.stringify({model:$('model').value,state,obstacle,next_obstacle:next,game_id:gameId})})).json()}catch(e){r={error:String(e)}}
+  busy=false;
+  if(r.error){$('msg').innerHTML=`<span class=err>${r.error}</span>`;stop();return}
+  $('lat').textContent=Math.round(performance.now()-t)+' ms';
+  const ps=r.probs;
+  $('probs').innerHTML=Object.entries(ps).map(([k,v])=>`<div class=pr>${k} · ${(v*100).toFixed(0)}%${k==r.action?' ← chosen':''}<div class="bar ${k==r.action?'pick':''}"><i style="width:${v*100}%"></i></div></div>`).join('')||`<b>${r.action}</b>`;
+  $('state').textContent=r.state;
+  const ok=resolve(obstacle,r.action);
+  await anim(r.action,ok);
+  if(!ok){over=true;stop();$('msg').innerHTML=`Crashed: <b>${r.action}</b> was wrong for ${obstacle.replace('_',' ')}.`;return}
+  state.cleared++;state.score+=Math.round(10*state.speed/6);state.speed=speedFor(state.cleared);
+  obstacle=next;next=genObstacle(state.cleared+1);draw();
+  if(state.cleared>=OBSTACLE_CAP){over=true;stop();$('msg').textContent=`Reached the ${OBSTACLE_CAP}-obstacle cap.`}
+}
+async function loop(){while(auto&&!over)await step();stop()}
+$('step').onclick=step;
+$('auto').onclick=()=>{auto=!auto;$('auto').textContent=auto?'Pause':'Auto-play';if(auto)loop()};
+$('reset').onclick=()=>{stop();reset()};
+$('model').onchange=()=>{stop();reset()};
+fetch('/api/dino/models').then(r=>r.json()).then(ms=>{
+  $('model').innerHTML=ms.map(m=>`<option value=${m.id} ${m.available?'':'disabled'}>${m.label}${m.available?'':' — '+m.reason}</option>`).join('');
+  $('model').value=(ms.find(m=>m.available&&!m.baseline)||ms[0]).id;
+});
+reset();
+</script>
+</html>
