@@ -9,8 +9,8 @@
 <div class=modes><a href="/dino">Arena</a><a class=on href="/dino/play">Single game</a><a href="/traces">Traces</a></div></nav>
 <main>
 <h1>Dino Run — single game</h1>
-<p class=sub>Watch one model react to each obstacle and see exactly what it was asked and how confident it was.</p>
-<p class=legend>Rules: 🌵 cactus needs <b>jump</b> · 🐦 low bird needs <b>duck</b> · 🐦 high bird needs <b>none</b> (run). Any other action is a crash.</p>
+<p class=sub>A 5×10 grid of cubes shifts one column toward the dino every 400ms; a fresh decision is asked every tick, not just when something is close. The dino sits in the leftmost column, 2nd row from the bottom, and moves up on jump / down on duck.</p>
+<p class=legend>Rules: 🌵 cactus needs <b>jump</b> · 🐦 low bird needs <b>duck</b> · 🦅 high bird needs <b>none</b> (run). Whatever sits at distance 0 arrives this tick — the wrong action for it is a crash. Row height is illustrative (cactus low, low-bird mid, high-bird top); the pass/fail rule is always by obstacle type, not row overlap.</p>
 
 <div class=panel>
   <div class=ctl>
@@ -22,9 +22,9 @@
 
 <div class=play>
   <div class=panel>
-    <h2>Track</h2>
-    <div class="track big" id=track><div class=ground></div><div class=dino id=dino>🦖</div></div>
-    <div class=stats><div>Score<b id=score>0</b></div><div>Cleared<b id=cleared>0</b></div><div>Speed<b id=speed>0</b></div><div>Latency<b id=lat>–</b></div></div>
+    <h2>Grid</h2>
+    <div class="dinogrid big" id=grid></div>
+    <div class=stats><div>Score<b id=score>0</b></div><div>Cleared<b id=cleared>0</b></div><div>Tick<b id=tick>0</b></div><div>Latency<b id=lat>–</b></div></div>
   </div>
   <div>
     <div class=panel><h2>Model's decision</h2><div id=probs class=empty>Press Step or Auto-play.</div></div>
@@ -35,53 +35,75 @@
 
 <script>
 const $=id=>document.getElementById(id);
-const EMOJI={cactus:'🌵',bird_low:'🐦',bird_high:'🐦'};
+const EMOJI={cactus:'🌵',bird_low:'🐦',bird_high:'🦅'};
 const CORRECT={cactus:'jump',bird_low:'duck',bird_high:'none'};
-const OBSTACLE_CAP=300;
-function speedFor(cleared){return Math.round(Math.min(6+cleared*0.15,18)*10)/10}
+const TICK_MS=400, GRID_LEN=10, ROWS=5, SPAWN_GAP_START=5, SPAWN_GAP_MIN=2, OBSTACLE_CAP=300, TICK_CAP=4000;
+// Rows are visual only (0=bottom..4=top) — the pass/fail rule stays the CORRECT lookup above, not row overlap.
+const DINO_ROW={none:1,jump:4,duck:0}, OBSTACLE_ROW={cactus:0,bird_low:2,bird_high:4};
+function spawnGapFor(cleared){return Math.max(SPAWN_GAP_MIN, SPAWN_GAP_START-Math.floor(cleared/15))}
 function genObstacle(cleared){const birdP=Math.min(0.2+cleared*0.01,0.7);if(Math.random()>birdP)return 'cactus';return Math.random()<0.5?'bird_low':'bird_high'}
-function resolve(obs,action){return CORRECT[obs]===action}
-
-let state,obstacle,next,gameId,auto=false,busy=false,over=false;
-const newId=()=>(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));
-function reset(){state={score:0,cleared:0,speed:speedFor(0)};obstacle=genObstacle(0);next=genObstacle(1);gameId=newId();over=false;$('msg').textContent='';$('track').classList.remove('crash');$('dino').className='dino';draw()}
-function draw(){$('score').textContent=state.score;$('cleared').textContent=state.cleared;$('speed').textContent=state.speed}
-function stop(){auto=false;$('auto').textContent='Auto-play'}
-function anim(action,cleared){
-  return new Promise(res=>{
-    const track=$('track'),dino=$('dino');
-    const obsEl=document.createElement('div');obsEl.className='obs o-'+obstacle;obsEl.textContent=EMOJI[obstacle];
-    track.append(obsEl);
-    const ms=Math.max(320,1100-state.speed*36);
-    requestAnimationFrame(()=>{obsEl.style.transition=`left ${ms}ms linear`;obsEl.style.left='96px'});
-    setTimeout(()=>{
-      if(action=='jump'||action=='duck')dino.className='dino '+action;
-      setTimeout(()=>{
-        dino.className='dino';
-        if(!cleared){track.classList.add('crash');obsEl.classList.add('crash')}
-        else{obsEl.style.transition='left 220ms linear, opacity 220ms linear';obsEl.style.left='-30px';obsEl.style.opacity='0';setTimeout(()=>obsEl.remove(),240)}
-        res();
-      },260);
-    },ms);
-  });
+function stepTick(state,action){
+  const arrived=state.obstacles.filter(o=>o.col===0);
+  for(const o of arrived)if(CORRECT[o.type]!==action)return o.type;
+  state.cleared+=arrived.length;state.score+=10*arrived.length;
+  state.obstacles=state.obstacles.filter(o=>o.col>0);
+  state.obstacles.forEach(o=>o.col--);
+  state.nextSpawnIn--;
+  if(state.nextSpawnIn<=0){state.obstacles.push({type:genObstacle(state.cleared),col:GRID_LEN-1});state.nextSpawnIn=spawnGapFor(state.cleared)}
+  state.tick++;
+  return null;
 }
-async function step(){
-  if(busy||over)return;busy=true;const t=performance.now();
-  let r;try{r=await (await fetch('/api/dino/decide',{method:'POST',body:JSON.stringify({model:$('model').value,state,obstacle,next_obstacle:next,game_id:gameId})})).json()}catch(e){r={error:String(e)}}
-  busy=false;
-  if(r.error){$('msg').innerHTML=`<span class=err>${r.error}</span>`;stop();return}
-  $('lat').textContent=Math.round(performance.now()-t)+' ms';
+function newState(){return {score:0,cleared:0,tick:0,obstacles:[],nextSpawnIn:SPAWN_GAP_START}}
+
+let state,gameId,auto=false,busy=false,over=false,lastAction=null,crashedType=null;
+const newId=()=>(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));
+function reset(){state=newState();gameId=newId();over=false;lastAction=null;crashedType=null;$('msg').textContent='';draw()}
+function draw(){
+  $('score').textContent=state.score;$('cleared').textContent=state.cleared;$('tick').textContent=state.tick;
+  const dinoRow=DINO_ROW[lastAction||'none'];
+  const occ={};state.obstacles.forEach(o=>occ[o.col+','+OBSTACLE_ROW[o.type]]=o);
+  let html='';
+  for(let cssR=0;cssR<ROWS;cssR++){
+    const gameRow=ROWS-1-cssR;
+    for(let c=0;c<GRID_LEN;c++){
+      let cls='cube',content='';
+      if(c===0&&gameRow===dinoRow){cls+=' dino';content='🦖'}
+      const o=occ[c+','+gameRow];
+      if(o){cls+=' ob-'+o.type;content=EMOJI[o.type];if(c===0&&over&&crashedType===o.type)cls+=' crash'}
+      html+=`<div class="${cls}">${content}</div>`;
+    }
+  }
+  $('grid').innerHTML=html;
+}
+function stop(){auto=false;$('auto').textContent='Auto-play'}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+async function tick(){
+  if(busy||over)return;busy=true;const t0=performance.now();
+  let r;try{r=await (await fetch('/api/dino/decide',{method:'POST',body:JSON.stringify({model:$('model').value,state,game_id:gameId})})).json()}catch(e){r={error:String(e)}}
+  const elapsed=performance.now()-t0;busy=false;
+  if(r.error){$('msg').innerHTML=`<span class=err>${r.error}</span>`;stop();return elapsed}
+  $('lat').textContent=Math.round(elapsed)+' ms';
   const ps=r.probs;
   $('probs').innerHTML=Object.entries(ps).map(([k,v])=>`<div class=pr>${k} · ${(v*100).toFixed(0)}%${k==r.action?' ← chosen':''}<div class="bar ${k==r.action?'pick':''}"><i style="width:${v*100}%"></i></div></div>`).join('')||`<b>${r.action}</b>`;
   $('state').textContent=r.state;
-  const ok=resolve(obstacle,r.action);
-  await anim(r.action,ok);
-  if(!ok){over=true;stop();$('msg').innerHTML=`Crashed: <b>${r.action}</b> was wrong for ${obstacle.replace('_',' ')}.`;return}
-  state.cleared++;state.score+=Math.round(10*state.speed/6);state.speed=speedFor(state.cleared);
-  obstacle=next;next=genObstacle(state.cleared+1);draw();
+  lastAction=r.action;
+  const crashedOn=stepTick(state,r.action);
+  if(crashedOn){over=true;crashedType=crashedOn;draw();stop();$('msg').innerHTML=`Crashed: <b>${r.action}</b> was wrong for ${crashedOn.replace('_',' ')} at distance 0.`;return elapsed}
+  draw();
   if(state.cleared>=OBSTACLE_CAP){over=true;stop();$('msg').textContent=`Reached the ${OBSTACLE_CAP}-obstacle cap.`}
+  if(state.tick>=TICK_CAP){over=true;stop();$('msg').textContent=`Reached the ${TICK_CAP}-tick cap.`}
+  return elapsed;
 }
-async function loop(){while(auto&&!over)await step();stop()}
+async function step(){await tick()}
+async function loop(){
+  while(auto&&!over){
+    const elapsed=await tick();
+    if(!auto||over)break;
+    const wait=TICK_MS-(elapsed||0);
+    if(wait>0)await sleep(wait);
+  }
+  stop();
+}
 $('step').onclick=step;
 $('auto').onclick=()=>{auto=!auto;$('auto').textContent=auto?'Pause':'Auto-play';if(auto)loop()};
 $('reset').onclick=()=>{stop();reset()};

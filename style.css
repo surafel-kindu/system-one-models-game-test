@@ -40,22 +40,17 @@ pre{font-size:11px;white-space:pre-wrap;background:var(--bg);border:1px solid va
 .pr{margin-bottom:8px;font-size:14px}
 .err{color:#d9534f;font-size:13px}
 
-/* Dino Run track */
-.track{position:relative;height:64px;background:var(--bg);border:1px solid var(--line);border-radius:8px;overflow:hidden}
-.track.big{height:160px;max-width:640px}
-.track .ground{position:absolute;left:0;right:0;bottom:10px;height:2px;background:var(--line)}
-.track.big .ground{bottom:24px}
-.track .dino{position:absolute;left:12px;bottom:10px;font-size:20px;line-height:1;transition:transform .15s ease-out}
-.track.big .dino{left:40px;bottom:24px;font-size:44px}
-.track .dino.jump{transform:translateY(-22px)}
-.track.big .dino.jump{transform:translateY(-56px)}
-.track .dino.duck{transform:scaleY(.55) translateY(4px);transform-origin:bottom}
-.track .obs{position:absolute;left:100%;font-size:18px;line-height:1;transition:left linear}
-.track.big .obs{font-size:38px}
-.track .obs.o-cactus{bottom:10px} .track.big .obs.o-cactus{bottom:24px}
-.track .obs.o-bird_low{bottom:24px} .track.big .obs.o-bird_low{bottom:70px}
-.track .obs.o-bird_high{bottom:42px} .track.big .obs.o-bird_high{bottom:112px}
-.track.crash{background:#e9635a22}
+/* Dino Run grid: a 5-row x 10-column board. Items move right to left, one column per tick; the
+   dino sits in the leftmost column and changes row with its action (up on jump, down on duck). */
+.dinogrid{display:grid;grid-template-columns:repeat(10,1fr);grid-template-rows:repeat(5,1fr);gap:3px;aspect-ratio:2/1;width:100%}
+.dinogrid .cube{border-radius:5px;background:var(--bg);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:11px;overflow:hidden}
+.dinogrid.big .cube{border-radius:8px;font-size:clamp(12px,2.4vw,24px)}
+.dinogrid .cube.dino{background:var(--panel);border-color:var(--accent)}
+.dinogrid .cube.ob-cactus{background:#5aa46933;border-color:#5aa469}
+.dinogrid .cube.ob-bird_low{background:#4c8dd633;border-color:#4c8dd6}
+.dinogrid .cube.ob-bird_high{background:#c98bd333;border-color:#c98bd3}
+.dinogrid .cube.crash{background:#e9635a55!important;border-color:#d9534f!important}
 .legend{font-size:12px;color:var(--muted);margin:6px 0 0}
 
 /* Chess */

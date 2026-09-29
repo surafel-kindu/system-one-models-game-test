@@ -5,7 +5,7 @@
 <title>Dino Run Arena</title>
 <link rel=stylesheet href="/style.css">
 <style>
-#games{display:grid;grid-template-columns:repeat(auto-fill,minmax(190px,1fr));gap:10px}
+#games{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
 .g{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
 .g.done{opacity:.75}
 .g .h{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}
@@ -16,7 +16,11 @@
 <main>
 <h1>Dino Run Arena</h1>
 <p class=sub>Run many games at once, compare players, and keep high scores.</p>
-<p class=legend>Rules: 🌵 cactus needs <b>jump</b> · 🐦 low bird needs <b>duck</b> · 🐦 high bird needs <b>none</b> (run). Any other action is a crash — no partial credit.</p>
+<p class=legend>A 5×10 grid shifts one column toward the dino every 400ms; a fresh decision is
+asked every tick. The dino sits leftmost, 2nd row from the bottom, and moves up on jump / down on
+duck. 🌵 cactus needs <b>jump</b> · 🐦 low bird needs <b>duck</b> · 🦅 high bird needs <b>none</b>.
+Anything else at distance 0 is a crash — no partial credit. Row height is illustrative; the
+pass/fail rule is always by obstacle type, not row overlap.</p>
 
 <div class=panel>
   <div class=ctl>
@@ -42,17 +46,30 @@
 <script>
 const $=id=>document.getElementById(id);
 const PAL=['#f67c5f','#4c8dd6','#5aa469','#c98bd3','#e0a93b','#3fb8b0','#a0785a','#d9628b'];
-const EMOJI={cactus:'🌵',bird_low:'🐦',bird_high:'🐦'};
+const EMOJI={cactus:'🌵',bird_low:'🐦',bird_high:'🦅'};
 const CORRECT={cactus:'jump',bird_low:'duck',bird_high:'none'};
-const OBSTACLE_CAP=300;
+const TICK_MS=400, GRID_LEN=10, ROWS=5, SPAWN_GAP_START=5, SPAWN_GAP_MIN=2, OBSTACLE_CAP=300, TICK_CAP=4000;
+// Rows are visual only (0=bottom..4=top) — the pass/fail rule stays the CORRECT lookup above, not row overlap.
+const DINO_ROW={none:1,jump:4,duck:0}, OBSTACLE_ROW={cactus:0,bird_low:2,bird_high:4};
 let models=[],color={},games=[],running=false,stopFlag=false,saved=[];
 
 // ---- dino rules (mirrors enginedino.py) ----
-function speedFor(cleared){return Math.round(Math.min(6+cleared*0.15,18)*10)/10}
+function spawnGapFor(cleared){return Math.max(SPAWN_GAP_MIN, SPAWN_GAP_START-Math.floor(cleared/15))}
 function genObstacle(cleared){const birdP=Math.min(0.2+cleared*0.01,0.7);if(Math.random()>birdP)return 'cactus';return Math.random()<0.5?'bird_low':'bird_high'}
-function resolve(obs,action){return CORRECT[obs]===action}
-const newRun=()=>({score:0,cleared:0,speed:speedFor(0)});
+function stepTick(state,action){
+  const arrived=state.obstacles.filter(o=>o.col===0);
+  for(const o of arrived)if(CORRECT[o.type]!==action)return o.type;
+  state.cleared+=arrived.length;state.score+=10*arrived.length;
+  state.obstacles=state.obstacles.filter(o=>o.col>0);
+  state.obstacles.forEach(o=>o.col--);
+  state.nextSpawnIn--;
+  if(state.nextSpawnIn<=0){state.obstacles.push({type:genObstacle(state.cleared),col:GRID_LEN-1});state.nextSpawnIn=spawnGapFor(state.cleared)}
+  state.tick++;
+  return null;
+}
+const newDinoState=()=>({score:0,cleared:0,tick:0,obstacles:[],nextSpawnIn:SPAWN_GAP_START});
 const label=id=>(models.find(m=>m.id==id)||{label:id}).label;
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
 
 // ---- setup ----
 async function init(){
@@ -68,45 +85,44 @@ const newId=()=>(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36
 function mkGame(model){
   const el=document.createElement('div');el.className='g';
   el.innerHTML=`<div class=h><b><span class=sw style="background:${color[model]}"></span>${label(model)}</b><span class=sc>0</span></div>`+
-    `<div class=track><div class=ground></div><div class=dino>🦖</div></div>`+
+    `<div class=dinogrid></div>`+
     `<div class=f><span class=cl>0 cleared</span><span class=st>running</span></div>`;
   $('games').append(el);
-  return {model,gameId:newId(),state:newRun(),obstacle:genObstacle(0),next:genObstacle(1),ms:0,over:false,el};
+  return {model,gameId:newId(),state:newDinoState(),lastAction:null,ms:0,over:false,el};
 }
-function header(g){g.el.querySelector('.sc').textContent=g.state.score;g.el.querySelector('.cl').textContent=g.state.cleared+' cleared'}
-function anim(g,cleared){
-  return new Promise(res=>{
-    const track=g.el.querySelector('.track'),dino=g.el.querySelector('.dino');
-    const obsEl=document.createElement('div');obsEl.className='obs o-'+g.obstacle;obsEl.textContent=EMOJI[g.obstacle];
-    track.append(obsEl);
-    const ms=Math.max(160,600-g.state.speed*22);
-    requestAnimationFrame(()=>{obsEl.style.transition=`left ${ms}ms linear`;obsEl.style.left='34px'});
-    setTimeout(()=>{
-      if(g.action=='jump'||g.action=='duck')dino.className='dino '+g.action;
-      setTimeout(()=>{
-        dino.className='dino';
-        if(!cleared){track.classList.add('crash');obsEl.classList.add('crash')}
-        else{obsEl.style.transition='left 160ms linear, opacity 160ms linear';obsEl.style.left='-20px';obsEl.style.opacity='0';setTimeout(()=>obsEl.remove(),180)}
-        res();
-      },180);
-    },ms);
-  });
+function draw(g){
+  g.el.querySelector('.sc').textContent=g.state.score;g.el.querySelector('.cl').textContent=g.state.cleared+' cleared';
+  const grid=g.el.querySelector('.dinogrid');
+  const dinoRow=DINO_ROW[g.lastAction||'none'];
+  const occ={};g.state.obstacles.forEach(o=>occ[o.col+','+OBSTACLE_ROW[o.type]]=o);
+  let html='';
+  for(let cssR=0;cssR<ROWS;cssR++){
+    const gameRow=ROWS-1-cssR;
+    for(let c=0;c<GRID_LEN;c++){
+      let cls='cube',content='';
+      if(c===0&&gameRow===dinoRow){cls+=' dino';content='🦖'}
+      const o=occ[c+','+gameRow];
+      if(o){cls+=' ob-'+o.type;content=EMOJI[o.type];if(c===0&&g.over&&g.crashOn===o.type)cls+=' crash'}
+      html+=`<div class="${cls}">${content}</div>`;
+    }
+  }
+  grid.innerHTML=html;
 }
 async function play(g){
-  header(g);
+  draw(g);
   while(!stopFlag&&!g.over){
     const t=performance.now();
-    let r;try{r=await (await fetch('/api/dino/decide',{method:'POST',body:JSON.stringify({model:g.model,state:g.state,obstacle:g.obstacle,next_obstacle:g.next,game_id:g.gameId})})).json()}catch(e){g.err=String(e);break}
-    g.ms+=performance.now()-t;
+    let r;try{r=await (await fetch('/api/dino/decide',{method:'POST',body:JSON.stringify({model:g.model,state:g.state,game_id:g.gameId})})).json()}catch(e){g.err=String(e);break}
+    const elapsed=performance.now()-t;g.ms+=elapsed;
     if(r.error){g.err=r.error;break}
-    g.action=r.action;
-    const ok=resolve(g.obstacle,r.action);
-    await anim(g,ok);
-    if(!ok){g.over=true;g.crashOn=g.obstacle;break}
-    g.state.cleared++;g.state.score+=Math.round(10*g.state.speed/6);g.state.speed=speedFor(g.state.cleared);
-    g.obstacle=g.next;g.next=genObstacle(g.state.cleared+1);
-    header(g);
-    if(g.state.cleared>=OBSTACLE_CAP){g.over=true;g.capped=true}
+    g.lastAction=r.action;
+    const crashedOn=stepTick(g.state,r.action);
+    if(crashedOn){g.over=true;g.crashOn=crashedOn;draw(g);break}
+    draw(g);
+    if(g.state.cleared>=OBSTACLE_CAP){g.over=true;g.capped=true;break}
+    if(g.state.tick>=TICK_CAP){g.over=true;g.capped=true;break}
+    const wait=TICK_MS-elapsed;
+    if(wait>0)await sleep(wait);
   }
   g.el.classList.add('done');
   if(g.err){

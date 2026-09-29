@@ -177,53 +177,76 @@ models into a loop, not as a strong 2048 agent.
 
 ## Dino Run
 
-A Chrome-dino-style runner, simplified to one decision per obstacle instead of real-time reflexes
-(the models are too slow — 0.1–0.5s — for a per-frame reaction game):
+A Chrome-dino-style runner, rendered as a **5-row × 10-column grid of cubes** (2048-style square
+tiles, not emoji on a free-form track). Obstacles move right to left, one column per **400ms
+tick**, and a fresh decision is asked **every tick** — not just when something is about to arrive.
+The dino sits fixed in the leftmost column, 2nd row from the bottom by default, and visibly changes
+row with its action: up on `jump`, down on `duck`. Each obstacle type renders at its own row too —
+🌵 cactus low, 🐦 low bird mid-height, 🦅 high bird at the top — so the board reads at a glance.
+
+**Row position is illustrative, not the rule.** With only 3 obstacle types, 3 actions, and 5 rows,
+no literal row-overlap collision system can reproduce "exactly one action is correct per obstacle
+type" — the combinatorics don't fit (worked through in `enginedino.py`'s comments). So the actual
+pass/fail check is still the same fixed lookup table as before, keyed by obstacle *type*; rows are
+there to make the grid legible, and mostly — not perfectly — line up with which action is correct.
 
 ```
-browser (JS game)  --state+obstacle+model-->  server.py  -->  enginedino.py  -->  models.py  -->  Laya / Jev / Drex
-        ^                                                                             |
-        +----------------------------------- chosen action ------------------------- +
+browser (JS game)  --state (score/cleared/grid)+model-->  server.py  -->  enginedino.py  -->  models.py  -->  the model
+        ^                                                                                          |
+        +--------------------------------------- chosen action ---------------------------------- +
 ```
 
-1. **Obstacle.** The browser generates the next obstacle (weighted by difficulty, like 2048's tile
-   spawns) and asks for an action: `jump`, `duck`, or `none`.
-2. **State text** names the obstacle and describes what each action generally does, e.g.
-   `Obstacle ahead: a bird flying low, at head height. After that: a cactus on the ground.`
-3. **Decision.** The model answers "which action?" as a multiple-choice question.
-4. **Resolution.** Exactly one action clears each obstacle type — any other is a crash, no partial credit:
+1. **Tick loop.** Every 400ms the browser: asks the model for an action, resolves whatever is at
+   distance 0 against it, shifts every other obstacle one column closer, and — on a fixed schedule
+   that tightens with difficulty — spawns a new obstacle at the far column. Several obstacles can
+   be in flight on the grid at once.
+2. **State text** lists everything currently on the grid with its distance, e.g.
+   `distance 0: a cactus on the ground` / `distance 3: a bird flying low, at head height`. Distance
+   0 means "arrives this tick"; nothing needs to be at distance 0 for a decision to be asked.
+3. **Decision.** The model answers "which action — jump, duck, or none?" as a multiple-choice
+   question, every tick, whether or not anything is imminent.
+4. **Resolution.** Exactly one action clears each obstacle type at distance 0 — any other is a
+   crash, no partial credit:
 
    | Obstacle | Correct action |
    |---|---|
    | 🌵 cactus (ground) | `jump` |
    | 🐦 bird flying low (head height) | `duck` |
-   | 🐦 bird flying high (overhead) | `none` (keep running) |
+   | 🦅 bird flying high (overhead) | `none` (keep running) |
 
-   The browser plays out the result (an approach animation, then a jump/duck/crash) and, on a
-   crash or the 300-obstacle cap, reports the finished game.
+   Nothing at distance 0 this tick is always safe, whatever the action. The browser is
+   client-authoritative for the grid (same pattern as 2048): the server only ever answers "what's
+   the action for this tick's state?"
 
-**Baselines:** `random` (uniform over the three actions) and `oracle` (always the correct action —
-an upper bound, since it never crashes and only stops at the 300-obstacle cap).
+**Pacing is a target, not a guarantee.** The 400ms is enforced by padding a *fast* decision back up
+to 400ms; a *slow* one (Drex over the network, or several Arena boards sharing one local model's
+concurrency slot) just takes as long as it takes. `ms/decision` in the Arena reflects that.
+
+**Baselines:** `random` (uniform over the three actions every tick) and `oracle` (always correct
+for whatever's at distance 0 — an upper bound, since it never crashes and only stops at the
+300-obstacle cap or a 4000-tick safety cap).
 
 **Benchmark:** `python bench_dino.py 5` runs the same models headless, no animation.
 
-**Honest takeaway on Kev-0.8B:** across 24 varied obstacles it answered `duck` 21 times regardless
-of the obstacle shown — 3/24 (12.5%) correct, worse than random's expected 33%. Verified this
-wasn't a code bug (2048 and Chess both get varied, sensible answers from the same backend): it's a
-genuine bias of this specific checkpoint on this exact task, and Kev's own README says as much —
-"Use Kev-0.8B when size matters more than accuracy."
+**Honest takeaway:** this task is harder than it looks for these models, and asking every tick
+(rather than only when something's close) makes that obvious. A 5-game sample under this mechanic:
 
-**GLiNER2.5-Decide** is more interesting: across the same 24-sample test it correctly jumped every
-cactus and ducked every low bird, but across 10/10 separate checks it **never once answered `none`**
-— for a high bird it always ducks too, which is wrong. Net 18/24 (75%) correct, well above random's
-33%, but the one obstacle needing "keep running" is a blind spot it never gets, which explains the
-volatile 5-run benchmark (`cleared [30, 0, 0, 0, 6]`): a run survives as long as no high bird shows
-up early, then ends the moment one does.
+| Player | Avg score | Cleared per game |
+|---|---|---|
+| random | 4 | 0–1 |
+| Kev-0.8B | 0 | all 0 |
+| Bev-Decider-0.4B | 0 | all 0 |
+| GLiNER2.5-Decide | 12 | mostly 0, one run reached 6 |
+| Laya | 38 | 0–7 |
+| Jev-BERTa | 40 | 2–5 |
+| oracle | 3000 | all 300 (the cap) |
 
-**Bev-Decider-0.4B** shows a clean, consistent one-notch-off pattern across the same 24-sample
-test: it **never answers `jump`** (0/24) — a ground cactus always gets `duck` (wrong), a low bird
-always gets `none` (wrong), and a high bird always gets `none` (correct, 6/6). Net 6/24 (25%),
-close to random and worse than GLiNER; it seems to have learned "duck or run," never "jump."
+Every model now scores far below what the old one-decision-per-obstacle version reached (which was
+in the hundreds). Reading a small grid of several obstacles at different distances and picking the
+right tick to act on the one at distance 0 is a meaningfully harder task than "here is the next
+obstacle, name its action" — and these are small classifiers with no real temporal or spatial
+reasoning demonstrated elsewhere in this project either. Treat Dino Run, more than ever, as a demo
+of wiring a decision loop together, not a benchmark these models are actually good at.
 
 ## Chess
 

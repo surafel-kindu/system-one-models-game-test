@@ -197,7 +197,7 @@ class H(BaseHTTPRequestHandler):
                         m, probs, state, illegal = player.decide(req["grid"])
                         payload = {"move": m, "probs": probs, "state": state, "illegal_pick": illegal}
                     else:
-                        a, probs, state = player.decide(req["state"], req["obstacle"], req.get("next_obstacle"))
+                        a, probs, state = player.decide(req["state"])
                         payload = {"action": a, "probs": probs, "state": state}
             except Exception as e:  # e.g. hosted API failure: report it instead of dropping the connection
                 log_trace(game, model, req.get("game_id"), req, {"error": str(e)}, (time.time() - t0) * 1000)
