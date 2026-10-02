@@ -76,6 +76,47 @@ class BevBackend(Backend):
         return a["choice"], a.get("probabilities", {})
 
 
+class DecisionMasterBackend(Backend):
+    """The local `decision-master` package (../decision-master, a Qwen3-based variable-candidate
+    decision model), via its JEV-style `decide_jev()`. The default Hub checkpoint
+    (`leobitz/decision-master-base`) is *gated*: it needs a Hugging Face token whose account has
+    been granted access (HF_TOKEN in .env, or `hf auth login`), or a local checkpoint directory
+    via DECISION_MASTER_MODEL."""
+    name, label = "dm", "DecisionMaster"
+
+    @classmethod
+    def _source(cls):
+        return os.environ.get("DECISION_MASTER_MODEL", "base")
+
+    @classmethod
+    def availability(cls):
+        try:
+            from decision_master.hub import resolve_model_id
+        except ImportError:
+            return False, "not installed — pip install --no-deps -e ../decision-master"
+        src = cls._source()
+        if os.path.isdir(src):
+            return True, ""
+        from huggingface_hub import get_token, try_to_load_from_cache
+        cached = try_to_load_from_cache(resolve_model_id(src), "config.json")
+        if isinstance(cached, str) or get_token():
+            return True, ""
+        return False, "gated Hub repo — set HF_TOKEN (needs access) or DECISION_MASTER_MODEL=/path/to/checkpoint"
+
+    def __init__(self):
+        ok, why = self.availability()
+        if not ok:
+            raise RuntimeError("DecisionMaster unavailable: " + why)
+        from decision_master import DecisionMaster
+        self.m = DecisionMaster(self._source(), device=os.environ.get("DECISION_MASTER_DEVICE") or None)
+
+    def answer(self, state, instructions, criteria):
+        payload = {"state": state, "questions": {
+            "choice": {"type": "choice", "instructions": instructions, "criteria": criteria}}}
+        a = self.m.decide_jev(payload)["answers"]["choice"]
+        return a["choice"], a["probabilities"]
+
+
 class JevBackend(Backend):
     name, label = "jev", "Jev-BERTa"
 
@@ -197,7 +238,7 @@ class KevBackend(Backend):
 
 
 BACKENDS = {"laya": LayaBackend, "jev": JevBackend, "drex": DrexBackend, "kev": KevBackend,
-            "gliner": GlinerBackend, "bev": BevBackend}
+            "gliner": GlinerBackend, "bev": BevBackend, "dm": DecisionMasterBackend}
 _cache = {}
 
 

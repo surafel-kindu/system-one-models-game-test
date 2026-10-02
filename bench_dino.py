@@ -1,5 +1,5 @@
 """Headless Dino Run benchmark: Laya / Jev / Drex / Kev / GLiNER2.5-Decide / Bev-Decider vs random vs the oracle.
-Usage: python bench_dino.py [games] [laya] [jev] [drex] [kev] [gliner] [bev] [random] [oracle]
+Usage: python bench_dino.py [games] [laya] [jev] [drex] [kev] [gliner] [bev] [dm] [random] [oracle]
 """
 import sys, time
 from enginedino import CORRECT, PLAYERS, get_player, play

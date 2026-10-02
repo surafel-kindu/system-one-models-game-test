@@ -206,6 +206,7 @@ DrexPlayer = model_player("drex")
 KevPlayer = model_player("kev")
 GlinerPlayer = model_player("gliner")
 BevPlayer = model_player("bev")
+DmPlayer = model_player("dm")
 
 
 class RandomPlayer(Player):
@@ -230,10 +231,10 @@ class GreedyPlayer(Player):
         return best, {best: 1.0}, "greedy: highest merge score, then most empty cells", False
 
 
-LayaPlayer.baseline = JevPlayer.baseline = DrexPlayer.baseline = KevPlayer.baseline = GlinerPlayer.baseline = BevPlayer.baseline = False
+LayaPlayer.baseline = JevPlayer.baseline = DrexPlayer.baseline = KevPlayer.baseline = GlinerPlayer.baseline = BevPlayer.baseline = DmPlayer.baseline = False
 
 # To add a model: subclass Player, implement choose(state, crit), register it here.
-PLAYERS = {"laya": LayaPlayer, "jev": JevPlayer, "drex": DrexPlayer, "kev": KevPlayer, "gliner": GlinerPlayer, "bev": BevPlayer, "random": RandomPlayer, "greedy": GreedyPlayer}
+PLAYERS = {"laya": LayaPlayer, "jev": JevPlayer, "drex": DrexPlayer, "kev": KevPlayer, "gliner": GlinerPlayer, "bev": BevPlayer, "dm": DmPlayer, "random": RandomPlayer, "greedy": GreedyPlayer}
 _cache = {}
 
 

@@ -1,5 +1,5 @@
 """Headless 2048 benchmark: Laya / Jev / Drex / Kev / GLiNER2.5-Decide / Bev-Decider vs random vs greedy.
-Usage: python bench.py [games] [laya] [jev] [drex] [kev] [gliner] [bev] [random] [greedy]
+Usage: python bench.py [games] [laya] [jev] [drex] [kev] [gliner] [bev] [dm] [random] [greedy]
 """
 import random, sys, time
 from engine2048 import *

@@ -6,7 +6,7 @@ situation is described in text, the model picks one of the options, and you watc
 browser — alone (2048, Dino Run), many at once to compare players (all three), or head-to-head
 (Chess: two models play *each other*).
 
-Six models are supported (plus baseline players) and can be switched from the UI, in every game:
+Seven models are supported (plus baseline players) and can be switched from the UI, in every game:
 
 | Model | Package | Checkpoint | Size |
 |---|---|---|---|
@@ -16,9 +16,10 @@ Six models are supported (plus baseline players) and can be switched from the UI
 | **Kev-0.8B** | [github.com/jaredpalmer/kev](https://github.com/jaredpalmer/kev) (run yourself) | [`jaredpalmer/kev-0.8b`](https://huggingface.co/jaredpalmer/kev-0.8b) | ~0.8B |
 | **GLiNER2.5-Decide** | [`gliner2`](https://pypi.org/project/gliner2/) | [`fastino/GLiNER2.5-Decide`](https://huggingface.co/fastino/GLiNER2.5-Decide) | ~340M |
 | **Bev-Decider-0.4B** | [`bev-decider`](https://pypi.org/project/bev-decider/) | [`avbiswas/bev-decider-0.4B`](https://huggingface.co/avbiswas/bev-decider-0.4B) | ~0.4B |
+| **DecisionMaster** | local package [`../decision-master`](../decision-master) | `leobitz/decision-master-base` (**gated** on the Hub) | Qwen3-based |
 
-Laya, Jev, GLiNER and Bev are local, non-generative classifiers: they score a list of candidate
-answers against a context and return probabilities. None of the six was trained on any of these
+Laya, Jev, GLiNER, Bev and DecisionMaster are local, non-generative classifiers: they score a list of candidate
+answers against a context and return probabilities. None of the seven was trained on any of these
 games. Each is loaded **once** and shared between all three games (`models.py`), not duplicated
 per game.
 
@@ -29,6 +30,7 @@ Requires Python 3.10+. The first run downloads both local checkpoints (a few min
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
 pip install laya chess gliner2 peft bev-decider git+https://github.com/leobitz/jev-berta.git
+# optional: DecisionMaster — see its section below (needs --no-deps and gated weights)
 python server.py
 ```
 
@@ -55,6 +57,26 @@ cp .env.example .env      # then set DREX_API_KEY=...
 `.env` is git-ignored. Without a key, Drex appears greyed out with a hint and everything else works.
 Optional: `DREX_MODEL` (default `drex-latest`) and `DREX_CONCURRENCY` (default 2, the free-tier limit; paid allows 16).
 The client retries on 429/529 (honouring `retry-after-ms`). **Note:** state text is sent to Drex's servers.
+
+### DecisionMaster (local package, gated weights)
+
+`../decision-master` is a sibling checkout of a Qwen3-based model that scores a variable-size list
+of candidates. `DecisionMasterBackend` uses its JEV-style `decide_jev()`, which takes the same
+`(state, instructions, criteria)` shape as every other backend here. Three things to know:
+
+- **Install without dependencies.** Its `pyproject.toml` pins `transformers<5`, but this project
+  runs transformers 5.x for the other models. Its own test suite passes on 5.17, so install it
+  with `--no-deps` rather than letting pip downgrade everything else:
+  `pip install --no-deps -e ../decision-master`
+- **The default Hub checkpoint is gated.** `leobitz/decision-master-base` returns a 401 unless your
+  Hugging Face account has been granted access *and* you're authenticated — put `HF_TOKEN=...` in
+  `.env` (or run `hf auth login`), or point `DECISION_MASTER_MODEL` at a local checkpoint directory
+  (`config.json` + `model.safetensors` + tokenizer files). Until one of those is true it shows
+  greyed out in every game with that reason, like an unconfigured Drex.
+- **Not benchmarked here.** Without access to the real weights I could only verify the integration
+  glue — against a tiny *random-weight* checkpoint (near-uniform probabilities that sum to 1 on
+  2048's, Dino Run's and Chess's candidate lists), not the real model's play — so there are no
+  score numbers for it in the benchmark sections below.
 
 ### Kev (run it yourself)
 
@@ -104,7 +126,7 @@ python bench_dino.py 5 gliner
 python bench_chess.py 200 greedy random laya jev kev gliner bev   # every pair plays once, 200-ply cap
 ```
 
-Player names: `laya`, `jev`, `drex`, `kev`, `gliner`, `bev`, plus each game's own baselines (`random` and
+Player names: `laya`, `jev`, `drex`, `kev`, `gliner`, `bev`, `dm`, plus each game's own baselines (`random` and
 `greedy` for 2048/Chess; `random` and `oracle` for Dino). The first argument is always the game
 count (2048/Dino) or the max-plies cutoff (Chess). Unlike the web UI, these scripts don't check
 availability first — naming `drex` without `DREX_API_KEY` set, or `kev` without its server running,

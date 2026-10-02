@@ -1,5 +1,5 @@
 """Headless chess benchmark: every pair among the given players plays once (alternating colors).
-Usage: python bench_chess.py [max_plies] [laya] [jev] [drex] [kev] [gliner] [bev] [random] [greedy]
+Usage: python bench_chess.py [max_plies] [laya] [jev] [drex] [kev] [gliner] [bev] [dm] [random] [greedy]
 """
 import sys, time
 from enginechess import get_player, play
