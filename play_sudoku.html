@@ -1,0 +1,91 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sudoku — Single Game</title>
+<link rel=stylesheet href="/style.css">
+<style>.play{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}</style>
+<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a><a href="/flappy">Flappy</a><a class=on href="/sudoku">Sudoku</a></div>
+<div class=modes><a href="/sudoku">Arena</a><a class=on href="/sudoku/play">Single game</a><a href="/traces">Traces</a></div></nav>
+<main>
+<h1>Sudoku — single game</h1>
+<p class=sub>Each step the engine fills any cell with exactly one legal digit, then asks the model about the next cell that needs a real decision. A wrong digit is a mistake (it isn't placed); three mistakes end the game.</p>
+<p class=legend>Bold = given · <span style="color:var(--accent)"><b>tan</b></span> = placed by the model · <span style="color:var(--muted)">grey</span> = filled automatically (only one legal digit) · highlighted = the cell just asked about (red if the model got it wrong).</p>
+
+<div class=panel>
+  <div class=ctl>
+    <label>Player <select id=model></select></label>
+    <button id=step>Step</button><button id=auto>Auto-play</button><button id=reset class=ghost>New puzzle</button>
+    <span id=msg class=sub style="margin:0"></span>
+  </div>
+</div>
+
+<div class=play>
+  <div class=panel>
+    <h2>Board</h2>
+    <div class="sudoku big" id=board></div>
+    <div class=stats><div>Score<b id=score>0</b></div><div>Mistakes<b id=mistakes>0/3</b></div><div>Placed<b id=placed>0</b></div><div>Latency<b id=lat>–</b></div></div>
+  </div>
+  <div>
+    <div class=panel><h2>Model's decision</h2><div id=probs class=empty>Press Step or Auto-play.</div></div>
+    <div class=panel><h2>State sent to the model</h2><pre id=state>–</pre></div>
+  </div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+let gameId=null,grid=null,kind=null,auto=false,busy=false,over=false,asked=null,wrong=null;
+
+function drawBoard(el,grid,kind,asked,wrong){
+  let html='';
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++){
+    let cls='cell'+(c%3==2&&c<8?' r':'')+(r%3==2&&r<8?' b':'');
+    if(kind[r][c])cls+=' '+kind[r][c];
+    if(asked&&asked[0]==r&&asked[1]==c)cls+=wrong?' wrong':' asked';
+    html+=`<div class="${cls}">${grid[r][c]||''}</div>`;
+  }
+  el.innerHTML=html;
+}
+function stats(s){
+  $('score').textContent=s.score;$('mistakes').textContent=s.mistakes+'/'+s.max_mistakes;$('placed').textContent=s.placed;
+}
+function stop(){auto=false;$('auto').textContent='Auto-play'}
+async function reset(){
+  stop();over=false;asked=wrong=null;$('msg').textContent='';$('probs').innerHTML='<div class=empty>Press Step or Auto-play.</div>';$('state').textContent='–';
+  const r=await (await fetch('/api/sudoku/games',{method:'POST',body:JSON.stringify({model:$('model').value,seed:Math.floor(Math.random()*1e9)})})).json();
+  if(r.error){$('msg').innerHTML=`<span class=err>${r.error}</span>`;return}
+  gameId=r.game_id;grid=r.grid;kind=r.given.map(row=>row.map(g=>g?'given':''));
+  drawBoard($('board'),grid,kind,null,false);stats(r);
+}
+async function step(){
+  if(busy||over||!gameId)return;busy=true;const t0=performance.now();
+  let r;try{r=await (await fetch(`/api/sudoku/games/${gameId}/step`,{method:'POST'})).json()}catch(e){r={error:String(e)}}
+  busy=false;
+  if(r.error){$('msg').innerHTML=`<span class=err>${r.error}</span>`;stop();return}
+  $('lat').textContent=Math.round(performance.now()-t0)+' ms';
+  (r.auto||[]).forEach(([a,b])=>kind[a][b]='auto');
+  asked=wrong=null;
+  const d=r.decision;
+  if(d){
+    asked=d.cell;wrong=!d.correct;
+    if(d.correct)kind[d.cell[0]][d.cell[1]]='model';
+    $('probs').innerHTML=Object.entries(d.probs).sort((a,b)=>b[1]-a[1]).map(([k,v])=>`<div class=pr>digit ${k} · ${(v*100).toFixed(0)}%${k==d.digit?' ← chosen':''}<div class="bar ${k==d.digit?'pick':''}"><i style="width:${v*100}%"></i></div></div>`).join('')||`<b>${d.digit}</b>`;
+    $('state').textContent=d.state;
+    $('msg').innerHTML=d.correct?`Row ${d.cell[0]+1}, col ${d.cell[1]+1}: <b>${d.digit}</b> ✓`:`<span class=err>Row ${d.cell[0]+1}, col ${d.cell[1]+1}: ${d.digit} ✗ — a mistake</span>`;
+  }
+  grid=r.grid;stats(r);drawBoard($('board'),grid,kind,asked,wrong);
+  if(r.over){over=true;stop();$('msg').innerHTML=r.result=='solved'?'<b>Solved!</b>':r.result=='failed'?'<span class=err>Out of mistakes — game over.</span>':'Reached the step cap.'}
+}
+async function loop(){while(auto&&!over)await step();stop()}
+$('step').onclick=step;
+$('auto').onclick=()=>{auto=!auto;$('auto').textContent=auto?'Pause':'Auto-play';if(auto)loop()};
+$('reset').onclick=reset;
+$('model').onchange=reset;
+fetch('/api/sudoku/models').then(r=>r.json()).then(async ms=>{
+  $('model').innerHTML=ms.map(m=>`<option value=${m.id} ${m.available?'':'disabled'}>${m.label}${m.available?'':' — '+m.reason}</option>`).join('');
+  $('model').value=(ms.find(m=>m.available&&!m.baseline)||ms[0]).id;
+  await reset();
+});
+</script>
+</html>

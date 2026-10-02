@@ -1,10 +1,10 @@
 # Arcade games played by small decision models
 
-Three games where the moves are chosen by a small **System 1 decision model** instead of a search
-algorithm or an LLM: **2048**, a **Chrome-dino-style runner**, and **Chess**. Each turn the
-situation is described in text, the model picks one of the options, and you watch it happen in the
-browser — alone (2048, Dino Run), many at once to compare players (all three), or head-to-head
-(Chess: two models play *each other*).
+Five games where the moves are chosen by a small **System 1 decision model** instead of a search
+algorithm or an LLM: **2048**, a **Chrome-dino-style runner**, **Chess**, **Flappy Bird** and
+**Sudoku**. Each turn the situation is described in text, the model picks one of the options, and
+you watch it happen in the browser — alone, many at once to compare players (all five), or
+head-to-head (Chess: two models play *each other*).
 
 Seven models are supported (plus baseline players) and can be switched from the UI, in every game:
 
@@ -20,7 +20,7 @@ Seven models are supported (plus baseline players) and can be switched from the 
 
 Laya, Jev, GLiNER, Bev and DecisionMaster are local, non-generative classifiers: they score a list of candidate
 answers against a context and return probabilities. None of the seven was trained on any of these
-games. Each is loaded **once** and shared between all three games (`models.py`), not duplicated
+games. Each is loaded **once** and shared between all five games (`models.py`), not duplicated
 per game.
 
 ## Quick start
@@ -35,15 +35,17 @@ python server.py
 ```
 
 Open <http://localhost:8048> — it redirects to the 2048 arena. Use the nav at the top of every
-page to switch game (**2048** / **Dino Run** / **Chess**) and mode:
+page to switch game (**2048** / **Dino Run** / **Chess** / **Flappy** / **Sudoku**) and mode:
 
 | | Arena (many games/matches at once) | The other mode |
 |---|---|---|
 | **2048** | `/2048` | `/2048/play` — one move at a time |
 | **Dino Run** | `/dino` | `/dino/play` — one obstacle at a time |
 | **Chess** | `/chess` — every pair plays each other | `/chess/play` — pick White and Black, one ply at a time |
+| **Flappy** | `/flappy` | `/flappy/play` — one tick at a time |
+| **Sudoku** | `/sudoku` — every board gets the same puzzle | `/sudoku/play` — one decision at a time |
 
-There's also <http://localhost:8048/traces> — every model decision across all three games, with filters (see [Traces](#traces) below).
+There's also <http://localhost:8048/traces> — every model decision across all five games, with filters (see [Traces](#traces) below).
 
 ### Drex API key
 
@@ -73,10 +75,11 @@ of candidates. `DecisionMasterBackend` uses its JEV-style `decide_jev()`, which 
   `.env` (or run `hf auth login`), or point `DECISION_MASTER_MODEL` at a local checkpoint directory
   (`config.json` + `model.safetensors` + tokenizer files). Until one of those is true it shows
   greyed out in every game with that reason, like an unconfigured Drex.
-- **Not benchmarked here.** Without access to the real weights I could only verify the integration
-  glue — against a tiny *random-weight* checkpoint (near-uniform probabilities that sum to 1 on
-  2048's, Dino Run's and Chess's candidate lists), not the real model's play — so there are no
-  score numbers for it in the benchmark sections below.
+- **Verified with the real weights, benchmarked on two games so far.** With a token that has access,
+  `leobitz/decision-master-base` (~1.1 GB) downloads and loads (CPU, float32), and it plays in every
+  game. I first checked the integration against a tiny random-weight checkpoint while access was
+  missing; the numbers in the [Flappy Bird](#flappy-bird) and [Sudoku](#sudoku) sections are from the
+  real model. It hasn't been benchmarked on 2048, Dino Run or Chess.
 
 ### Kev (run it yourself)
 
@@ -118,16 +121,20 @@ way to compare players. Run them from the activated venv, from this directory:
 | `bench.py` | Plays 2048 to the end, N times per player | `random`, `greedy`, `laya`, `jev` |
 | `bench_dino.py` | Plays Dino Run to a crash or the cap, N times per player | `laya`, `jev`, `random`, `oracle` |
 | `bench_chess.py` | Every pair of the given players plays once, alternating colors | `greedy`, `random` |
+| `bench_flappy.py` | Plays Flappy Bird until a crash or the cap, N runs per player (run *i* uses seed *i*: identical pipes) | `laya`, `jev`, `random`, `greedy`, `oracle` |
+| `bench_sudoku.py` | Solves N seeded puzzles per player (puzzle *i* from seed *i*: identical puzzles) | `laya`, `jev`, `random`, `greedy`, `oracle` |
 
 ```bash
 python bench.py 8                    # 8 games each, default players
 python bench.py 8 kev gliner bev     # 8 games each, only those three (random/greedy always included)
 python bench_dino.py 5 gliner
 python bench_chess.py 200 greedy random laya jev kev gliner bev   # every pair plays once, 200-ply cap
+python bench_flappy.py 5 random greedy oracle gliner             # 5 runs on identical pipes
+python bench_sudoku.py 10 greedy oracle laya dm                  # 10 identical puzzles
 ```
 
 Player names: `laya`, `jev`, `drex`, `kev`, `gliner`, `bev`, `dm`, plus each game's own baselines (`random` and
-`greedy` for 2048/Chess; `random` and `oracle` for Dino). The first argument is always the game
+`greedy` for 2048/Chess; `random` and `oracle` for Dino; `random`, `greedy` and `oracle` for Flappy/Sudoku). The first argument is always the game
 count (2048/Dino) or the max-plies cutoff (Chess). Unlike the web UI, these scripts don't check
 availability first — naming `drex` without `DREX_API_KEY` set, or `kev` without its server running,
 raises an error immediately and stops the whole run rather than skipping just that player.
@@ -145,6 +152,10 @@ compares players.
   in parallel with a live mini board/track. **2048** starts every board in a run — every player,
   every repeat — from the same two starting tiles (regenerated fresh on each **Start**), so a lucky
   or unlucky opening doesn't decide the comparison.
+- **Flappy Bird:** same as Dino Run — live mini grids, a decision every 400ms tick, the model's own
+  latency padding the tick.
+- **Sudoku:** like 2048, every board in a run gets the **same puzzle** (one seed per **Start**), so
+  a lucky puzzle can't favor a player. Boards advance as fast as the models answer — no fixed tick.
 - **Chess:** tick 2+ players; every unordered pair plays **matches per pairing** games, alternating
   who's White, since color is a real advantage. There's no solo baseline run — it's inherently
   head-to-head.
@@ -333,9 +344,95 @@ drew both Greedy and Random on ply limits in its small run — like GLiNER, safe
 a contrast with its weaker Dino Run showing. Treat Chess like 2048 and Dino Run: a demo of wiring
 decision models into a real, rules-correct game loop, not a strong chess engine.
 
+## Flappy Bird
+
+A **10-row × 12-column grid** that shifts one column left every **400ms tick**, with a fresh
+`flap` / `none` decision asked **every tick** — the same loop as Dino Run, but with real physics
+instead of a lookup table: the bird has a row and a vertical speed (a flap sets it to −2, gravity
+adds 1 per tick up to +2), pipes have a 4-row gap, and a pipe, the ceiling or the floor ends the run.
+The browser is client-authoritative (it mirrors `engineflappy.py`'s rules, like 2048 and Dino Run);
+the server only answers "what's the action for this state?".
+
+The state text gives the bird's row and speed and the next two pipes (ticks until each reaches the
+bird, and its gap rows). Each option also states where the bird will be next tick — including
+"hits the ceiling" / "hits the floor" — which is the lookahead a small classifier can't compute for itself.
+
+**Tuned until it was winnable.** My first constants (gap 4, a pipe every 5 ticks, gaps moving up to
+3 rows) produced pipe sequences that were *impossible* even for an exhaustive oracle — a falling
+bird can commit to a spot from which the next gap is unreachable. Spacing 6 and gap shifts of ≤2
+fixed it: the oracle now reaches the 300-pipe cap on 20 of 20 seeds. Without that check, "the models
+failed" would have been indistinguishable from "the game is broken".
+
+**Baselines:** `random`; `greedy` (a fixed rule steering toward the next gap's middle, with 1.5 rows
+of slack because a flap carries the bird ~3 rows); `oracle` (exact dynamic programming over every
+pipe already on the board — an upper bound).
+
+**Honest takeaway** (5 runs, identical pipes per run, `python bench_flappy.py 5 …`):
+
+| Player | Avg score | Pipes passed per run | Died on |
+|---|---|---|---|
+| random | 0 | all 0 | ceiling / floor |
+| Laya | 0 | all 0 | ceiling ×5 |
+| Jev-BERTa | 0 | all 0 | floor ×5 |
+| GLiNER2.5-Decide | 0 | all 0 | ceiling ×5 |
+| Bev-Decider-0.4B | 0 | all 0 | floor ×5 |
+| DecisionMaster | 0 | all 0 | ceiling ×5 |
+| greedy | 40 | 8, 2, 1, 8, 1 | pipe ×4, ceiling ×1 |
+| oracle | 3000 | all 300 (the cap) | — |
+
+**No model passes a single pipe** — they all die before the first one arrives. Sampling 40 random
+states, Laya and GLiNER answered `flap` on **40/40** (Laya's P(flap) only ranges 0.51–0.62, so it
+barely distinguishes situations at all), DecisionMaster on 36/40, while Jev (23/40) and Bev (10/40)
+do vary their answers — just not in a way that keeps a bird alive. Even with the next-tick position
+spelled out in each option, this is a continuous-control task these classifiers can't do.
+Kev wasn't running for this benchmark.
+
+## Sudoku
+
+Each step the engine **fills in every cell that has exactly one legal digit**, then asks the model
+about the next cell that needs a real decision: *which digit goes here?*, among the digits still
+legal there. A wrong digit is a **mistake** (it isn't placed, and is excluded from that cell next
+time); **three mistakes end the game**. Score = 10 per correct decision, +100 for solving.
+
+- **Puzzles** are generated from an integer seed with a **unique solution** (~25 givens). Because the
+  seed picks the puzzle, an Arena run — or a benchmark — gives every player the identical puzzle.
+  Fewer givens than the usual ~35 was deliberate: at 35, naked singles alone solved *every* puzzle, the
+  model was never asked anything, and every player scored 100.
+- **Which cell gets asked:** one that has a digit with nowhere else to go (so a pure deduction
+  exists), otherwise the cell with the fewest candidates.
+- **State text** is the board with the target cell marked `?`. Each option reads
+  `5: other cells that can still take it — row 0, column 3, box 1`: a **0 means the digit has
+  nowhere else to go in that row/column/box, so it must be the answer** (the instructions say so).
+  That's a rule a model has to apply, not an answer handed over — which is exactly what's being measured.
+- **Server-authoritative, like Chess:** the solution lives on the server and is never sent to the
+  browser (`POST /api/sudoku/games`, then `POST /api/sudoku/games/<id>/step`). Auto-filled cells show
+  grey, the model's correct placements tan, and a wrong guess flashes red.
+
+**Baselines:** `random` (a random legal digit), `greedy` (applies the "0 elsewhere" rule literally —
+no model), `oracle` (reads the solution).
+
+**Honest takeaway** (10 identical puzzles, `python bench_sudoku.py 10 …`):
+
+| Player | Avg score | Solved | Avg mistakes | Avg correct decisions |
+|---|---|---|---|---|
+| random | 31.0 | 1/10 | 2.80 | 2.1 |
+| Laya | 29.0 | 1/10 | 2.80 | 1.9 |
+| Jev-BERTa | 55.0 | 2/10 | 2.80 | 3.5 |
+| GLiNER2.5-Decide | 48.0 | 1/10 | 2.80 | 3.8 |
+| Bev-Decider-0.4B | 1.0 | 0/10 | 3.00 | 0.1 |
+| DecisionMaster | 26.0 | 1/10 | 2.90 | 1.6 |
+| greedy | 230.0 | 10/10 | 0.60 | 13.0 |
+| oracle | 236.0 | 10/10 | 0.00 | 13.6 |
+
+**Every model is at or near random level**, while a ten-line rule that follows the instructions
+solves all ten. The models aren't *applying the stated rule* — the information needed is in front of
+them in each option. Bev is the worst (0.1 correct decisions per game: it nearly always loses its three
+mistakes immediately). The tiny sample (10 puzzles) matters for the one-or-two-solves differences
+between Jev, GLiNER, Laya and random, which aren't meaningful. Kev wasn't running for this benchmark.
+
 ## Traces
 
-<http://localhost:8048/traces> logs and lets you browse **every** model decision, across all three
+<http://localhost:8048/traces> logs and lets you browse **every** model decision, across all five
 games, on its own page.
 
 - **What's captured.** Each call to `/api/2048/decide`, `/api/dino/decide`, or a chess match's
@@ -354,8 +451,16 @@ games, on its own page.
 
 Local models (Laya, Jev) aren't safe to call concurrently, and Drex's free tier allows only 2
 requests at once — `server.py` enforces this with one semaphore per backend, shared across all
-three games (so 2048, Dino Run, and Chess arenas running at the same time still queue correctly
-behind one Laya lock, not three).
+five games (so any mix of arenas running at the same time still queue correctly behind one Laya
+lock, not five).
+
+**GPU-backed backends share one more lock.** Laya and Bev-Decider run on the Apple GPU (MPS).
+Metal aborts the *entire process* — `failed assertion 'A command encoder is already encoding to
+this command buffer'`, no Python traceback — if two threads use the GPU at once, and the
+per-backend semaphores don't stop two *different* GPU models overlapping. A Sudoku Arena with
+Laya and Bev ticked killed the server exactly that way. `models.GPU_LOCK` now serializes all
+GPU-backed calls (DecisionMaster only when `DECISION_MASTER_DEVICE` puts it on a GPU). Verified by
+running 14 games across 7 backends concurrently: 0 errors, server still up.
 
 ## Files
 
@@ -365,14 +470,18 @@ behind one Laya lock, not three).
 | `engine2048.py` | 2048 rules, state description, move filtering, model-backed players |
 | `enginedino.py` | Dino Run rules, state description, model-backed players |
 | `enginechess.py` | Chess rules (via `python-chess`), move shortlisting, state description, model-backed players |
+| `engineflappy.py` | Flappy Bird physics, state description, model-backed players, exact-DP oracle |
+| `enginesudoku.py` | Sudoku generation (unique solutions, seeded), auto-fill, state description, model-backed players |
 | `server.py` | HTTP server: page routing per game/mode, `/api/<game>/{models,decide,results}`, plus chess's `/api/chess/matches[/​<id>/step]` |
 | `arena_2048.html` / `play_2048.html` | 2048 arena and single-game pages |
 | `arena_dino.html` / `play_dino.html` | Dino Run arena and single-game pages |
 | `arena_chess.html` / `play_chess.html` | Chess arena (round-robin) and one-match pages |
-| `style.css` | Shared design for all six pages |
+| `arena_flappy.html` / `play_flappy.html` | Flappy Bird arena and single-game pages |
+| `arena_sudoku.html` / `play_sudoku.html` | Sudoku arena (same puzzle per run) and single-game pages |
+| `style.css` | Shared design for every page |
 | `.env.example` | Template for your API key (copy to `.env`) |
-| `results_2048.json` / `results_dino.json` / `results_chess.json` | Saved arena results (created on first finish, git-ignored) |
-| `bench.py` / `bench_dino.py` / `bench_chess.py` | Headless benchmarks against each game's baselines |
+| `results_<game>.json` | Saved arena results per game (created on first finish, git-ignored) |
+| `bench.py` / `bench_dino.py` / `bench_chess.py` / `bench_flappy.py` / `bench_sudoku.py` | Headless benchmarks against each game's baselines |
 
 ## Notes
 

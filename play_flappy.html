@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flappy Bird — Single Game</title>
+<link rel=stylesheet href="/style.css">
+<style>.play{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}</style>
+<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a><a class=on href="/flappy">Flappy</a><a href="/sudoku">Sudoku</a></div>
+<div class=modes><a href="/flappy">Arena</a><a class=on href="/flappy/play">Single game</a><a href="/traces">Traces</a></div></nav>
+<main>
+<h1>Flappy Bird — single game</h1>
+<p class=sub>A 10×12 grid shifts one column left every 400ms and a fresh flap-or-not decision is asked every tick. Unlike Dino Run's lookup rule, this is real physics: the bird has a row and a vertical speed, and pipes, the ceiling and the floor all end the run.</p>
+<p class=legend>🐦 flap = rise 2 rows and reset the fall; do nothing = fall faster (up to 2 rows per tick). The bird must be inside the pipe's gap on the tick the pipe reaches its column.</p>
+
+<div class=panel>
+  <div class=ctl>
+    <label>Player <select id=model></select></label>
+    <button id=step>Step</button><button id=auto>Auto-play</button><button id=reset class=ghost>New run</button>
+    <span id=msg class=sub style="margin:0"></span>
+  </div>
+</div>
+
+<div class=play>
+  <div class=panel>
+    <h2>Grid</h2>
+    <div class="flapgrid big" id=grid></div>
+    <div class=stats><div>Score<b id=score>0</b></div><div>Pipes<b id=passed>0</b></div><div>Tick<b id=tick>0</b></div><div>Latency<b id=lat>–</b></div></div>
+  </div>
+  <div>
+    <div class=panel><h2>Model's decision</h2><div id=probs class=empty>Press Step or Auto-play.</div></div>
+    <div class=panel><h2>State sent to the model</h2><pre id=state>–</pre></div>
+  </div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+// ---- flappy rules (mirrors engineflappy.py) ----
+const ROWS=10, COLS=12, BIRD_COL=2, GAP=4, FLAP_VY=-2, MAX_FALL=2, SPAWN_EVERY=6, MAX_GAP_SHIFT=2, TICK_MS=400, PIPE_CAP=300, TICK_CAP=4000;
+function nextMotion(row,vy,action){const vy2=action==='flap'?FLAP_VY:Math.min(vy+1,MAX_FALL);return [row+vy2,vy2]}
+function newState(){return {score:0,tick:0,passed:0,bird_row:ROWS>>1,vy:0,pipes:[],next_spawn_in:SPAWN_EVERY+1,last_gap:(ROWS-GAP)>>1}}
+function stepTick(s,action){
+  const [row,vy]=nextMotion(s.bird_row,s.vy,action);
+  s.bird_row=Math.max(0,Math.min(ROWS-1,row));s.vy=vy;
+  if(row<0)return 'ceiling';if(row>ROWS-1)return 'floor';
+  s.pipes.forEach(p=>p.col--);
+  for(const p of s.pipes)if(p.col===BIRD_COL){if(p.gap<=row&&row<p.gap+GAP){s.passed++;s.score+=10}else return 'pipe'}
+  s.pipes=s.pipes.filter(p=>p.col>=0);
+  s.next_spawn_in--;
+  if(s.next_spawn_in<=0){
+    let gap=s.last_gap+Math.floor(Math.random()*(2*MAX_GAP_SHIFT+1))-MAX_GAP_SHIFT;
+    gap=Math.max(0,Math.min(ROWS-GAP,gap));
+    s.pipes.push({col:COLS-1,gap});s.last_gap=gap;s.next_spawn_in=SPAWN_EVERY;
+  }
+  s.tick++;return null;
+}
+
+let state,gameId,auto=false,busy=false,over=false,crashedWhy=null;
+const newId=()=>(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));
+function reset(){state=newState();gameId=newId();over=false;crashedWhy=null;$('msg').textContent='';draw()}
+function draw(){
+  $('score').textContent=state.score;$('passed').textContent=state.passed;$('tick').textContent=state.tick;
+  const pipeAt={};state.pipes.forEach(p=>pipeAt[p.col]=p);
+  let html='';
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    let cls='cube',content='';
+    const p=pipeAt[c];
+    if(p&&!(p.gap<=r&&r<p.gap+GAP))cls+=' pipe';
+    if(c===BIRD_COL&&r===state.bird_row){cls+=' bird'+(over?' crash':'');content='🐦'}
+    html+=`<div class="${cls}">${content}</div>`;
+  }
+  $('grid').innerHTML=html;
+}
+function stop(){auto=false;$('auto').textContent='Auto-play'}
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+async function tick(){
+  if(busy||over)return;busy=true;const t0=performance.now();
+  let r;try{r=await (await fetch('/api/flappy/decide',{method:'POST',body:JSON.stringify({model:$('model').value,state,game_id:gameId})})).json()}catch(e){r={error:String(e)}}
+  const elapsed=performance.now()-t0;busy=false;
+  if(r.error){$('msg').innerHTML=`<span class=err>${r.error}</span>`;stop();return elapsed}
+  $('lat').textContent=Math.round(elapsed)+' ms';
+  const ps=r.probs;
+  $('probs').innerHTML=Object.entries(ps).map(([k,v])=>`<div class=pr>${k} · ${(v*100).toFixed(0)}%${k==r.action?' ← chosen':''}<div class="bar ${k==r.action?'pick':''}"><i style="width:${v*100}%"></i></div></div>`).join('')||`<b>${r.action}</b>`;
+  $('state').textContent=r.state;
+  const why=stepTick(state,r.action);
+  if(why){over=true;crashedWhy=why;draw();stop();$('msg').innerHTML=`Crashed into the <b>${why}</b> after passing ${state.passed} pipe${state.passed==1?'':'s'}.`;return elapsed}
+  draw();
+  if(state.passed>=PIPE_CAP||state.tick>=TICK_CAP){over=true;stop();$('msg').textContent='Reached the run cap.'}
+  return elapsed;
+}
+async function step(){await tick()}
+async function loop(){
+  while(auto&&!over){
+    const elapsed=await tick();
+    if(!auto||over)break;
+    const wait=TICK_MS-(elapsed||0);
+    if(wait>0)await sleep(wait);
+  }
+  stop();
+}
+$('step').onclick=step;
+$('auto').onclick=()=>{auto=!auto;$('auto').textContent=auto?'Pause':'Auto-play';if(auto)loop()};
+$('reset').onclick=()=>{stop();reset()};
+$('model').onchange=()=>{stop();reset()};
+fetch('/api/flappy/models').then(r=>r.json()).then(ms=>{
+  $('model').innerHTML=ms.map(m=>`<option value=${m.id} ${m.available?'':'disabled'}>${m.label}${m.available?'':' — '+m.reason}</option>`).join('');
+  $('model').value=(ms.find(m=>m.available&&!m.baseline)||ms[0]).id;
+});
+reset();
+</script>
+</html>

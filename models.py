@@ -7,7 +7,9 @@ instance per name and every game reuses it instead of loading its own copy.
 """
 import json
 import os
+import contextlib
 import socket
+import threading
 import time
 import urllib.error
 import urllib.request
@@ -33,6 +35,12 @@ _load_env()
 # Set before any `huggingface_hub` import runs; a real env var (e.g. to re-enable Xet) still wins.
 os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
 
+# Laya and Bev-Decider run on the Apple GPU (MPS). Metal aborts the *whole process* ("A command encoder
+# is already encoding to this command buffer") if two threads encode GPU work at once, and every
+# backend has its own concurrency slot — so two different GPU-backed models in one Arena run could
+# overlap and kill the server. GPU-backed backends therefore also share this one lock.
+GPU_LOCK = threading.Lock()
+
 
 class Backend:
     name = "base"
@@ -57,7 +65,8 @@ class LayaBackend(Backend):
 
     def answer(self, state, instructions, criteria):
         q = {"choice": {"type": "choice", "instructions": instructions, "criteria": criteria}}
-        a = self.agent.system_one(state, q)["answers"]["choice"]
+        with GPU_LOCK:
+            a = self.agent.system_one(state, q)["answers"]["choice"]
         return a["choice"], a.get("probabilities", {})
 
 
@@ -72,7 +81,8 @@ class BevBackend(Backend):
 
     def answer(self, state, instructions, criteria):
         q = {"choice": {"type": "choice", "instructions": instructions, "criteria": criteria}}
-        a = self.decider.decide(state, q)["choice"]
+        with GPU_LOCK:
+            a = self.decider.decide(state, q)["choice"]
         return a["choice"], a.get("probabilities", {})
 
 
@@ -113,7 +123,9 @@ class DecisionMasterBackend(Backend):
     def answer(self, state, instructions, criteria):
         payload = {"state": state, "questions": {
             "choice": {"type": "choice", "instructions": instructions, "criteria": criteria}}}
-        a = self.m.decide_jev(payload)["answers"]["choice"]
+        on_gpu = self.m.device.type != "cpu"
+        with (GPU_LOCK if on_gpu else contextlib.nullcontext()):
+            a = self.m.decide_jev(payload)["answers"]["choice"]
         return a["choice"], a["probabilities"]
 
 

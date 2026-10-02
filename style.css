@@ -4,7 +4,7 @@
 body{margin:0;background:var(--bg);color:var(--fg);font-family:system-ui,sans-serif;padding:0 16px 60px}
 main{max-width:1200px;margin:0 auto}
 nav{max-width:1200px;margin:0 auto;padding:14px 0 6px;display:flex;flex-wrap:wrap;gap:10px;justify-content:space-between;align-items:center}
-nav .games,nav .modes{display:flex;gap:6px;align-items:center}
+nav .games,nav .modes{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
 nav b{margin-right:8px;font-size:15px}
 nav a{padding:6px 12px;border-radius:6px;text-decoration:none;color:var(--muted);font-size:14px}
 nav a.on{background:var(--accent);color:#fff}
@@ -26,7 +26,8 @@ table{width:100%;border-collapse:collapse;font-size:14px}
 th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
 th:first-child,td:first-child{text-align:left} th{color:var(--muted);font-weight:500;font-size:12px}
 .tbl{overflow-x:auto}
-.cols{display:grid;grid-template-columns:2fr 1fr;gap:16px} @media(max-width:900px){.cols,.play{grid-template-columns:1fr!important}}
+.cols{display:grid;grid-template-columns:2fr 1fr;gap:16px} .cols>*{min-width:0}
+@media(max-width:900px){.cols,.play{grid-template-columns:minmax(0,1fr)!important}}
 .bar{height:10px;background:var(--line);border-radius:5px;overflow:hidden;min-width:80px}.bar i{display:block;height:100%;background:var(--accent)}
 .bar.best i,.bar.pick i{background:var(--pick)}
 .sw{display:inline-block;width:10px;height:10px;border-radius:50%;margin-right:6px}
@@ -81,3 +82,26 @@ pre{font-size:11px;white-space:pre-wrap;background:var(--bg);border:1px solid va
 .vs .side.turn small{color:var(--accent)}
 .moves{font-size:12px;color:var(--muted);max-height:120px;overflow:auto;line-height:1.6}
 .moves b{color:var(--fg)}
+
+/* Flappy Bird grid: 10 rows x 12 columns. The bird is fixed in one column and moves between rows;
+   pipes (a column of cubes with a gap) slide right to left, one column per tick. */
+.flapgrid{display:grid;grid-template-columns:repeat(12,1fr);grid-template-rows:repeat(10,1fr);gap:2px;aspect-ratio:12/10;width:100%}
+.flapgrid .cube{border-radius:4px;background:var(--bg);border:1px solid var(--line);
+  display:flex;align-items:center;justify-content:center;font-size:10px;overflow:hidden}
+.flapgrid.big .cube{border-radius:6px;font-size:clamp(12px,2.2vw,22px)}
+.flapgrid .cube.pipe{background:#5aa46955;border-color:#5aa469}
+.flapgrid .cube.bird{background:var(--panel);border-color:var(--accent)}
+.flapgrid .cube.crash{background:#e9635a55!important;border-color:#d9534f!important}
+
+/* Sudoku board: 9x9 with heavier lines between the 3x3 boxes */
+.sudoku{display:grid;grid-template-columns:repeat(9,1fr);width:100%;aspect-ratio:1;border:2px solid var(--fg);border-radius:4px;overflow:hidden}
+.sudoku.big{max-width:480px}
+.sudoku .cell{display:flex;align-items:center;justify-content:center;border:1px solid var(--line);font-size:11px;color:var(--fg)}
+.sudoku.big .cell{font-size:clamp(16px,3.4vw,30px)}
+.sudoku .cell.r{border-right:2px solid var(--fg)}
+.sudoku .cell.b{border-bottom:2px solid var(--fg)}
+.sudoku .cell.given{font-weight:700;background:var(--bg)}
+.sudoku .cell.model{color:var(--accent);font-weight:700}
+.sudoku .cell.auto{color:var(--muted)}
+.sudoku .cell.asked{background:#f67c5f33}
+.sudoku .cell.wrong{background:#e9635a77}

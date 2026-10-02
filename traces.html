@@ -19,7 +19,7 @@
 .chev{color:var(--muted);text-align:right}
 #list .empty{padding:20px 0}
 </style>
-<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a></div>
+<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a><a href="/flappy">Flappy</a><a href="/sudoku">Sudoku</a></div>
 <div class=modes><a class=on href="/traces">Traces</a></div></nav>
 <main>
 <h1>Traces</h1>
@@ -43,7 +43,7 @@
 
 <script>
 const $=id=>document.getElementById(id);
-const GAMES=['2048','dino','chess'];
+const GAMES=['2048','dino','chess','flappy','sudoku'];
 let modelLabels={},busy=false;
 
 function fmtTime(ts){const d=new Date(ts);return d.toLocaleTimeString()+'.'+String(d.getMilliseconds()).padStart(3,'0')}
@@ -52,6 +52,8 @@ function summary(t){
   if(r.error)return {cls:'err',text:'error: '+r.error};
   if(t.game=='2048')return {text:(r.move||'–')+(r.illegal_pick?' (was illegal, replayed)':'')};
   if(t.game=='dino')return {text:r.action||'–'};
+  if(t.game=='flappy')return {text:r.action||'–'};
+  if(t.game=='sudoku'){const d=r.decision;return {text:d?`row ${d.cell[0]+1} col ${d.cell[1]+1}: ${d.digit} ${d.correct?'✓':'✗'}${r.over?' — '+r.result:''}`:(r.over?'finished — '+r.result:'no decision')}}
   if(t.game=='chess')return {text:(t.request&&t.request.by?t.request.by+': ':'')+(r.san||r.move||'–')+(r.over?` — ${r.result} (${(r.reason||'').replace(/_/g,' ')})`:'')};
   return {text:''};
 }

@@ -13,6 +13,10 @@ Routes:
   Chess only (the board is adversarial and stateful, so it's kept server-side per match):
   POST /api/chess/matches            {white, black} -> {match_id, fen, turn, over, history}
   POST /api/chess/matches/<id>/step  -> plays the side-to-move's next move, returns the new state
+  /flappy, /flappy/play       Flappy Bird (tick-based, like Dino Run: POST /api/flappy/decide)
+  /sudoku, /sudoku/play       Sudoku (server-authoritative like Chess):
+  POST /api/sudoku/games            {model, seed} -> {game_id, grid, given, ...}
+  POST /api/sudoku/games/<id>/step  -> auto-fills forced cells, asks the model about the next one
   /traces                     the trace browser page
   GET  /api/traces?game=&model=&game_id=&q=&limit=   filtered trace log, newest first
 """
@@ -30,18 +34,24 @@ import chess
 import engine2048
 import enginechess
 import enginedino
+import engineflappy
+import enginesudoku
 from models import get_backend
 
 HERE = os.path.dirname(os.path.abspath(__file__))
-GAMES = {"2048": engine2048, "dino": enginedino, "chess": enginechess}
+GAMES = {"2048": engine2048, "dino": enginedino, "chess": enginechess, "flappy": engineflappy,
+         "sudoku": enginesudoku}
 RESULTS = {g: os.path.join(HERE, f"results_{g}.json") for g in GAMES}
 PAGES = {
     ("2048", "arena"): "arena_2048.html", ("2048", "play"): "play_2048.html",
     ("dino", "arena"): "arena_dino.html", ("dino", "play"): "play_dino.html",
     ("chess", "arena"): "arena_chess.html", ("chess", "play"): "play_chess.html",
+    ("flappy", "arena"): "arena_flappy.html", ("flappy", "play"): "play_flappy.html",
+    ("sudoku", "arena"): "arena_sudoku.html", ("sudoku", "play"): "play_sudoku.html",
 }
 _res_lock = threading.Lock()
 MATCHES = {}  # chess match_id -> {board, white, black, history, lock}
+SUDOKU = {}   # sudoku game_id -> {game, model, lock}
 _matches_lock = threading.Lock()
 
 # Every model decision (2048/Dino's /decide, Chess's /step) is appended here as one JSON line:
@@ -166,6 +176,10 @@ class H(BaseHTTPRequestHandler):
             return self._new_match(mod, req)
         if game == "chess" and len(parts) == 5 and parts[2] == "matches" and parts[4] == "step":
             return self._step_match(mod, parts[3])
+        if game == "sudoku" and len(parts) == 3 and parts[2] == "games":
+            return self._new_sudoku(mod, req)
+        if game == "sudoku" and len(parts) == 5 and parts[2] == "games" and parts[4] == "step":
+            return self._step_sudoku(mod, parts[3])
         if len(parts) != 3:
             return self.send_error(404)
 
@@ -196,9 +210,11 @@ class H(BaseHTTPRequestHandler):
                     if game == "2048":
                         m, probs, state, illegal = player.decide(req["grid"])
                         payload = {"move": m, "probs": probs, "state": state, "illegal_pick": illegal}
-                    else:
+                    elif game in ("dino", "flappy"):
                         a, probs, state = player.decide(req["state"])
                         payload = {"action": a, "probs": probs, "state": state}
+                    else:
+                        return self._send({"error": f"{game} is driven through /games, not /decide"}, code=404)
             except Exception as e:  # e.g. hosted API failure: report it instead of dropping the connection
                 log_trace(game, model, req.get("game_id"), req, {"error": str(e)}, (time.time() - t0) * 1000)
                 return self._send({"error": str(e)}, code=502)
@@ -272,6 +288,44 @@ class H(BaseHTTPRequestHandler):
                        "over": over, "result": result, "reason": reason, "mate_square": mate_square,
                        "ply": board.ply(), "history": match["history"]}
             log_trace("chess", model, mid, trace_req, payload, (time.time() - t0) * 1000)
+            return self._send(payload)
+
+    def _new_sudoku(self, mod, req):
+        model = req.get("model")
+        if model not in mod.PLAYERS:
+            return self._send({"error": "unknown model"}, code=400)
+        ok, why = mod.PLAYERS[model].availability()
+        if not ok:
+            return self._send({"error": why}, code=400)
+        seed = req.get("seed")
+        game = mod.new_game(int(seed) if seed is not None else None)
+        gid = uuid.uuid4().hex[:12]
+        with _matches_lock:
+            SUDOKU[gid] = {"game": game, "model": model, "lock": threading.Lock()}
+        return self._send({"game_id": gid, **mod.public(game)})
+
+    def _step_sudoku(self, mod, gid):
+        entry = SUDOKU.get(gid)
+        if not entry:
+            return self._send({"error": "unknown game (server may have restarted)"}, code=404)
+        with entry["lock"]:
+            game, model = entry["game"], entry["model"]
+            if game["over"]:
+                return self._send({"auto": [], "decision": None, **mod.public(game)})
+            flat = "".join(str(v) for row in game["grid"] for v in row)
+            trace_req = {"game_id": gid, "model": model, "seed": game["seed"], "grid_before": flat}
+            ok, why = mod.PLAYERS[model].availability()
+            if not ok:
+                return self._send({"error": why}, code=400)
+            t0 = time.time()
+            try:
+                with _slot(model):
+                    result = mod.step(game, mod.get_player(model))
+            except Exception as e:
+                log_trace("sudoku", model, gid, trace_req, {"error": str(e)}, (time.time() - t0) * 1000)
+                return self._send({"error": str(e)}, code=502)
+            payload = {**result, **mod.public(game)}
+            log_trace("sudoku", model, gid, trace_req, payload, (time.time() - t0) * 1000)
             return self._send(payload)
 
     def log_message(self, *a): pass

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flappy Bird Arena</title>
+<link rel=stylesheet href="/style.css">
+<style>
+#games{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.g{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+.g.done{opacity:.75}
+.g .h{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}
+.g .f{font-size:11px;color:var(--muted);margin-top:5px;display:flex;justify-content:space-between}
+</style>
+<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a><a class=on href="/flappy">Flappy</a><a href="/sudoku">Sudoku</a></div>
+<div class=modes><a class=on href="/flappy">Arena</a><a href="/flappy/play">Single game</a><a href="/traces">Traces</a></div></nav>
+<main>
+<h1>Flappy Bird Arena</h1>
+<p class=sub>Run many games at once, compare players, and keep high scores.</p>
+<p class=legend>A 10×12 grid shifts one column left every 400ms; a fresh flap-or-not decision is asked
+every tick. The bird must be inside a pipe's gap when the pipe reaches it — pipes, the ceiling and the
+floor all end the run. Real physics, not a lookup table: each option states where the bird will be next tick.</p>
+
+<div class=panel>
+  <div class=ctl>
+    <span id=players>Loading players…</span>
+    <label>Games per player <input type=number id=n value=3 min=1 max=20></label>
+    <button id=start>Start</button><button id=stop class=ghost disabled>Stop</button>
+    <button id=clear class=ghost title="Remove board cards from the page (saved results stay)">Clear boards</button>
+    <span id=status class=sub style="margin:0"></span>
+  </div>
+</div>
+
+<div class=panel><h2>Live runs</h2><div id=games><div class=empty>Nothing running yet — pick players and press Start.</div></div></div>
+
+<div class=cols>
+  <div>
+    <div class=panel><h2>This run</h2><div class=tbl id=runTbl><div class=empty>No finished games yet.</div></div></div>
+    <div class=panel><h2>All time (saved)</h2><div class=tbl id=allTbl><div class=empty>No saved games yet.</div></div></div>
+  </div>
+  <div class=panel><h2>High scores</h2><div class=tbl id=hi><div class=empty>No saved games yet.</div></div></div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const PAL=['#f67c5f','#4c8dd6','#5aa469','#c98bd3','#e0a93b','#3fb8b0','#a0785a','#d9628b'];
+let models=[],color={},games=[],running=false,stopFlag=false,saved=[];
+
+// ---- flappy rules (mirrors engineflappy.py) ----
+const ROWS=10, COLS=12, BIRD_COL=2, GAP=4, FLAP_VY=-2, MAX_FALL=2, SPAWN_EVERY=6, MAX_GAP_SHIFT=2, TICK_MS=400, PIPE_CAP=300, TICK_CAP=4000;
+function nextMotion(row,vy,action){const vy2=action==='flap'?FLAP_VY:Math.min(vy+1,MAX_FALL);return [row+vy2,vy2]}
+function newState(){return {score:0,tick:0,passed:0,bird_row:ROWS>>1,vy:0,pipes:[],next_spawn_in:SPAWN_EVERY+1,last_gap:(ROWS-GAP)>>1}}
+function stepTick(s,action){
+  const [row,vy]=nextMotion(s.bird_row,s.vy,action);
+  s.bird_row=Math.max(0,Math.min(ROWS-1,row));s.vy=vy;
+  if(row<0)return 'ceiling';if(row>ROWS-1)return 'floor';
+  s.pipes.forEach(p=>p.col--);
+  for(const p of s.pipes)if(p.col===BIRD_COL){if(p.gap<=row&&row<p.gap+GAP){s.passed++;s.score+=10}else return 'pipe'}
+  s.pipes=s.pipes.filter(p=>p.col>=0);
+  s.next_spawn_in--;
+  if(s.next_spawn_in<=0){
+    let gap=s.last_gap+Math.floor(Math.random()*(2*MAX_GAP_SHIFT+1))-MAX_GAP_SHIFT;
+    gap=Math.max(0,Math.min(ROWS-GAP,gap));
+    s.pipes.push({col:COLS-1,gap});s.last_gap=gap;s.next_spawn_in=SPAWN_EVERY;
+  }
+  s.tick++;return null;
+}
+const label=id=>(models.find(m=>m.id==id)||{label:id}).label;
+function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
+
+// ---- setup ----
+async function init(){
+  models=await (await fetch('/api/flappy/models')).json();
+  models.forEach((m,i)=>color[m.id]=PAL[i%PAL.length]);
+  $('players').innerHTML=models.map(m=>`<label class="${m.available?'':'off'}" title="${m.reason||''}"><input type=checkbox value="${m.id}" ${m.available&&!m.baseline?'checked':''} ${m.available?'':'disabled'}><span class=sw style="background:${color[m.id]}"></span>${m.label}${m.available?'':` <small>(${m.reason})</small>`}</label>`).join(' ');
+  await loadSaved();
+}
+async function loadSaved(){saved=await (await fetch('/api/flappy/results')).json();renderAll()}
+
+// ---- running games ----
+const newId=()=>(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));
+function mkGame(model){
+  const el=document.createElement('div');el.className='g';
+  el.innerHTML=`<div class=h><b><span class=sw style="background:${color[model]}"></span>${label(model)}</b><span class=sc>0</span></div>`+
+    `<div class=flapgrid></div><div class=f><span class=cl>0 pipes</span><span class=st>running</span></div>`;
+  $('games').append(el);
+  return {model,gameId:newId(),state:newState(),ms:0,decisions:0,over:false,el};
+}
+function draw(g){
+  g.el.querySelector('.sc').textContent=g.state.score;g.el.querySelector('.cl').textContent=g.state.passed+' pipes';
+  const pipeAt={};g.state.pipes.forEach(p=>pipeAt[p.col]=p);
+  let html='';
+  for(let r=0;r<ROWS;r++)for(let c=0;c<COLS;c++){
+    let cls='cube',content='';
+    const p=pipeAt[c];
+    if(p&&!(p.gap<=r&&r<p.gap+GAP))cls+=' pipe';
+    if(c===BIRD_COL&&r===g.state.bird_row){cls+=' bird'+(g.crashOn?' crash':'');content='🐦'}
+    html+=`<div class="${cls}">${content}</div>`;
+  }
+  g.el.querySelector('.flapgrid').innerHTML=html;
+}
+async function play(g){
+  draw(g);
+  while(!stopFlag&&!g.over){
+    const t=performance.now();
+    let r;try{r=await (await fetch('/api/flappy/decide',{method:'POST',body:JSON.stringify({model:g.model,state:g.state,game_id:g.gameId})})).json()}catch(e){g.err=String(e);break}
+    const elapsed=performance.now()-t;g.ms+=elapsed;g.decisions++;
+    if(r.error){g.err=r.error;break}
+    const why=stepTick(g.state,r.action);
+    if(why){g.over=true;g.crashOn=why;draw(g);break}
+    draw(g);
+    if(g.state.passed>=PIPE_CAP||g.state.tick>=TICK_CAP){g.over=true;g.capped=true;break}
+    const wait=TICK_MS-elapsed;
+    if(wait>0)await sleep(wait);
+  }
+  g.el.classList.add('done');
+  if(g.err){
+    g.el.querySelector('.st').textContent='error';g.el.title=g.err;g.el.querySelector('.st').classList.add('err');
+  } else if(g.over){  // genuine finish (crash or cap) — Stop alone must not save a mid-run snapshot
+    g.el.querySelector('.st').textContent=g.capped?'capped':'hit '+g.crashOn;
+    const rec={model:g.model,score:g.state.score,passed:g.state.passed,ticks:g.state.tick,ms_per_move:g.decisions?Math.round(g.ms/g.decisions):0,crash_on:g.crashOn||null};
+    await fetch('/api/flappy/results',{method:'POST',body:JSON.stringify(rec)});saved.push(rec);renderAll();
+  } else {
+    g.el.querySelector('.st').textContent='stopped';
+  }
+}
+async function start(){
+  const picked=[...document.querySelectorAll('#players input:checked')].map(i=>i.value);
+  if(!picked.length||running)return;
+  const n=Math.max(1,Math.min(20,+$('n').value||1));
+  running=true;stopFlag=false;$('start').disabled=true;$('stop').disabled=false;
+  games=[];$('games').innerHTML='';
+  picked.forEach(m=>{for(let i=0;i<n;i++)games.push(mkGame(m))});
+  const poll=setInterval(()=>{const d=games.filter(g=>g.over).length;$('status').textContent=`${d}/${games.length} finished`;renderRun()},500);
+  await Promise.all(games.map(play));
+  clearInterval(poll);running=false;$('start').disabled=false;$('stop').disabled=true;
+  $('status').textContent=stopFlag?'stopped (unfinished games are not saved)':'all games finished';renderAll();
+}
+
+// ---- stats ----
+function summarize(rows){
+  const by={};
+  rows.forEach(r=>{(by[r.model]??=[]).push(r)});
+  return Object.entries(by).map(([id,rs])=>{
+    const sum=k=>rs.reduce((a,r)=>a+(r[k]||0),0),deaths={};
+    rs.forEach(r=>{if(r.crash_on)deaths[r.crash_on]=(deaths[r.crash_on]||0)+1});
+    const worst=Object.entries(deaths).sort((a,b)=>b[1]-a[1])[0];
+    return {id,games:rs.length,avg:sum('score')/rs.length,best:Math.max(...rs.map(r=>r.score)),
+      passed:sum('passed')/rs.length,ms:sum('ms_per_move')/rs.length,worst:worst?worst[0]:'–'};
+  }).sort((a,b)=>b.avg-a.avg);
+}
+function table(rows,empty){
+  if(!rows.length)return `<div class=empty>${empty}</div>`;
+  const top=Math.max(...rows.map(r=>r.avg));
+  return `<table><tr><th>Player<th>Games<th>Avg score<th><th>Best score<th>Avg pipes<th>Usually hits<th>ms/decision</tr>`+
+   rows.map((r,i)=>`<tr><td><span class=sw style="background:${color[r.id]}"></span>${label(r.id)}<td>${r.games}<td><b>${Math.round(r.avg)}</b>
+    <td><div class="bar ${i==0?'best':''}"><i style="width:${top?r.avg/top*100:0}%"></i></div><td>${r.best}<td>${r.passed.toFixed(1)}<td>${r.worst}<td>${Math.round(r.ms)}</tr>`).join('')+`</table>`;
+}
+function renderRun(){$('runTbl').innerHTML=table(summarize(games.filter(g=>g.over&&!g.err).map(g=>({model:g.model,score:g.state.score,passed:g.state.passed,ms_per_move:g.decisions?Math.round(g.ms/g.decisions):0,crash_on:g.crashOn||null}))),'No finished games yet.')}
+function renderAll(){
+  renderRun();
+  $('allTbl').innerHTML=table(summarize(saved),'No saved games yet.');
+  const top=[...saved].sort((a,b)=>b.score-a.score).slice(0,10);
+  $('hi').innerHTML=top.length?`<table><tr><th>#<th>Player<th>Score<th>Pipes</tr>`+top.map((r,i)=>`<tr><td>${i+1}<td><span class=sw style="background:${color[r.model]||'#999'}"></span>${label(r.model)}<td><b>${r.score}</b><td>${r.passed}</tr>`).join('')+`</table>`:'<div class=empty>No saved games yet.</div>';
+}
+
+$('start').onclick=start;
+$('stop').onclick=()=>{stopFlag=true};
+$('clear').onclick=()=>{if(!running){games=[];$('games').innerHTML='<div class=empty>Boards cleared.</div>';renderAll()}};
+init();
+</script>
+</html>

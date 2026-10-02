@@ -1,0 +1,143 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Sudoku Arena</title>
+<link rel=stylesheet href="/style.css">
+<style>
+#games{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
+.g{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
+.g.done{opacity:.8}
+.g .h{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}
+.g .f{font-size:11px;color:var(--muted);margin-top:5px;display:flex;justify-content:space-between}
+</style>
+<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a><a href="/flappy">Flappy</a><a class=on href="/sudoku">Sudoku</a></div>
+<div class=modes><a class=on href="/sudoku">Arena</a><a href="/sudoku/play">Single game</a><a href="/traces">Traces</a></div></nav>
+<main>
+<h1>Sudoku Arena</h1>
+<p class=sub>Run many games at once, compare players, and keep high scores.</p>
+<p class=legend>Every board in a run gets the <b>same puzzle</b> (regenerated on each Start), so a lucky puzzle
+doesn't favor one player. Forced cells are filled automatically; each model decision picks the digit for the
+next cell that needs one. A wrong digit is a mistake; three end the game. Score = 10 per correct decision, +100 for solving.</p>
+
+<div class=panel>
+  <div class=ctl>
+    <span id=players>Loading players…</span>
+    <label>Games per player <input type=number id=n value=3 min=1 max=20></label>
+    <button id=start>Start</button><button id=stop class=ghost disabled>Stop</button>
+    <button id=clear class=ghost title="Remove board cards from the page (saved results stay)">Clear boards</button>
+    <span id=status class=sub style="margin:0"></span>
+  </div>
+</div>
+
+<div class=panel><h2>Live boards</h2><div id=games><div class=empty>Nothing running yet — pick players and press Start.</div></div></div>
+
+<div class=cols>
+  <div>
+    <div class=panel><h2>This run</h2><div class=tbl id=runTbl><div class=empty>No finished games yet.</div></div></div>
+    <div class=panel><h2>All time (saved)</h2><div class=tbl id=allTbl><div class=empty>No saved games yet.</div></div></div>
+  </div>
+  <div class=panel><h2>High scores</h2><div class=tbl id=hi><div class=empty>No saved games yet.</div></div></div>
+</div>
+</main>
+
+<script>
+const $=id=>document.getElementById(id);
+const PAL=['#f67c5f','#4c8dd6','#5aa469','#c98bd3','#e0a93b','#3fb8b0','#a0785a','#d9628b'];
+let models=[],color={},games=[],running=false,stopFlag=false,saved=[];
+const label=id=>(models.find(m=>m.id==id)||{label:id}).label;
+
+async function init(){
+  models=await (await fetch('/api/sudoku/models')).json();
+  models.forEach((m,i)=>color[m.id]=PAL[i%PAL.length]);
+  $('players').innerHTML=models.map(m=>`<label class="${m.available?'':'off'}" title="${m.reason||''}"><input type=checkbox value="${m.id}" ${m.available&&!m.baseline?'checked':''} ${m.available?'':'disabled'}><span class=sw style="background:${color[m.id]}"></span>${m.label}${m.available?'':` <small>(${m.reason})</small>`}</label>`).join(' ');
+  await loadSaved();
+}
+async function loadSaved(){saved=await (await fetch('/api/sudoku/results')).json();renderAll()}
+
+function drawBoard(g){
+  let html='';
+  for(let r=0;r<9;r++)for(let c=0;c<9;c++){
+    let cls='cell'+(c%3==2&&c<8?' r':'')+(r%3==2&&r<8?' b':'');
+    if(g.kind[r][c])cls+=' '+g.kind[r][c];
+    if(g.asked&&g.asked[0]==r&&g.asked[1]==c)cls+=g.wrong?' wrong':' asked';
+    html+=`<div class="${cls}">${g.grid[r][c]||''}</div>`;
+  }
+  g.el.querySelector('.sudoku').innerHTML=html;
+  g.el.querySelector('.sc').textContent=g.score;
+  g.el.querySelector('.mi').textContent=g.mistakes+'/3 mistakes';
+}
+function mkGame(model){
+  const el=document.createElement('div');el.className='g';
+  el.innerHTML=`<div class=h><b><span class=sw style="background:${color[model]}"></span>${label(model)}</b><span class=sc>0</span></div>`+
+    `<div class=sudoku></div><div class=f><span class=mi>0/3 mistakes</span><span class=st>starting…</span></div>`;
+  $('games').append(el);
+  return {model,el,ms:0,decisions:0,over:false,score:0,mistakes:0,placed:0,steps:0,grid:null,kind:null,asked:null,wrong:false};
+}
+async function play(g,seed){
+  let r;try{r=await (await fetch('/api/sudoku/games',{method:'POST',body:JSON.stringify({model:g.model,seed})})).json()}catch(e){r={error:String(e)}}
+  if(r.error){g.err=r.error}
+  else{g.id=r.game_id;g.grid=r.grid;g.kind=r.given.map(row=>row.map(v=>v?'given':''));drawBoard(g);g.el.querySelector('.st').textContent='running'}
+  while(!g.err&&!stopFlag&&!g.over){
+    const t=performance.now();
+    let s;try{s=await (await fetch(`/api/sudoku/games/${g.id}/step`,{method:'POST'})).json()}catch(e){g.err=String(e);break}
+    if(s.error){g.err=s.error;break}
+    if(s.decision){g.ms+=performance.now()-t;g.decisions++}
+    (s.auto||[]).forEach(([a,b])=>g.kind[a][b]='auto');
+    g.asked=g.wrong=null;
+    if(s.decision){g.asked=s.decision.cell;g.wrong=!s.decision.correct;if(s.decision.correct)g.kind[g.asked[0]][g.asked[1]]='model'}
+    g.grid=s.grid;g.score=s.score;g.mistakes=s.mistakes;g.placed=s.placed;g.steps=s.steps;
+    drawBoard(g);
+    if(s.over){g.over=true;g.result=s.result}
+  }
+  g.el.classList.add('done');
+  if(g.err){g.el.querySelector('.st').textContent='error';g.el.title=g.err;g.el.querySelector('.st').classList.add('err');return}
+  if(!g.over){g.el.querySelector('.st').textContent='stopped';return}   // Stop alone must not save a mid-run snapshot
+  g.el.querySelector('.st').textContent=g.result;
+  const rec={model:g.model,score:g.score,placed:g.placed,mistakes:g.mistakes,solved:g.result==='solved',steps:g.steps,ms_per_move:g.decisions?Math.round(g.ms/g.decisions):0};
+  await fetch('/api/sudoku/results',{method:'POST',body:JSON.stringify(rec)});saved.push(rec);renderAll();
+}
+async function start(){
+  const picked=[...document.querySelectorAll('#players input:checked')].map(i=>i.value);
+  if(!picked.length||running)return;
+  const n=Math.max(1,Math.min(20,+$('n').value||1));
+  running=true;stopFlag=false;$('start').disabled=true;$('stop').disabled=false;
+  games=[];$('games').innerHTML='';
+  const seed=Math.floor(Math.random()*1e9);   // one puzzle for every board in this run
+  picked.forEach(m=>{for(let i=0;i<n;i++)games.push(mkGame(m))});
+  const poll=setInterval(()=>{const d=games.filter(g=>g.over).length;$('status').textContent=`${d}/${games.length} finished`;renderRun()},500);
+  await Promise.all(games.map(g=>play(g,seed)));
+  clearInterval(poll);running=false;$('start').disabled=false;$('stop').disabled=true;
+  $('status').textContent=stopFlag?'stopped (unfinished games are not saved)':'all games finished';renderAll();
+}
+
+function summarize(rows){
+  const by={};
+  rows.forEach(r=>{(by[r.model]??=[]).push(r)});
+  return Object.entries(by).map(([id,rs])=>{
+    const avg=k=>rs.reduce((a,r)=>a+(r[k]||0),0)/rs.length;
+    return {id,games:rs.length,avg:avg('score'),best:Math.max(...rs.map(r=>r.score)),solved:rs.filter(r=>r.solved).length/rs.length,
+      mistakes:avg('mistakes'),placed:avg('placed'),ms:avg('ms_per_move')};
+  }).sort((a,b)=>b.avg-a.avg);
+}
+function table(rows,empty){
+  if(!rows.length)return `<div class=empty>${empty}</div>`;
+  const top=Math.max(...rows.map(r=>r.avg));
+  return `<table><tr><th>Player<th>Games<th>Avg score<th><th>Solved<th>Avg mistakes<th>Avg correct<th>ms/decision</tr>`+
+   rows.map((r,i)=>`<tr><td><span class=sw style="background:${color[r.id]}"></span>${label(r.id)}<td>${r.games}<td><b>${Math.round(r.avg)}</b>
+    <td><div class="bar ${i==0?'best':''}"><i style="width:${top?r.avg/top*100:0}%"></i></div><td>${Math.round(r.solved*100)}%<td>${r.mistakes.toFixed(2)}<td>${r.placed.toFixed(1)}<td>${Math.round(r.ms)}</tr>`).join('')+`</table>`;
+}
+function renderRun(){$('runTbl').innerHTML=table(summarize(games.filter(g=>g.over&&!g.err).map(g=>({model:g.model,score:g.score,placed:g.placed,mistakes:g.mistakes,solved:g.result==='solved',ms_per_move:g.decisions?Math.round(g.ms/g.decisions):0}))),'No finished games yet.')}
+function renderAll(){
+  renderRun();
+  $('allTbl').innerHTML=table(summarize(saved),'No saved games yet.');
+  const top=[...saved].sort((a,b)=>b.score-a.score).slice(0,10);
+  $('hi').innerHTML=top.length?`<table><tr><th>#<th>Player<th>Score<th>Mistakes<th>Solved</tr>`+top.map((r,i)=>`<tr><td>${i+1}<td><span class=sw style="background:${color[r.model]||'#999'}"></span>${label(r.model)}<td><b>${r.score}</b><td>${r.mistakes}<td>${r.solved?'✓':'–'}</tr>`).join('')+`</table>`:'<div class=empty>No saved games yet.</div>';
+}
+
+$('start').onclick=start;
+$('stop').onclick=()=>{stopFlag=true};
+$('clear').onclick=()=>{if(!running){games=[];$('games').innerHTML='<div class=empty>Boards cleared.</div>';renderAll()}};
+init();
+</script>
+</html>
