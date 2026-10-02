@@ -3,6 +3,7 @@ Usage: python bench.py [games] [laya] [jev] [drex] [kev] [gliner] [bev] [dm] [ra
 """
 import random, sys, time
 from engine2048 import *
+from runs import Run
 
 def play(policy, seed, cap=2000):
     rng = random.Random(seed); g = new_game(rng); score = steps = 0
@@ -25,6 +26,9 @@ if __name__ == "__main__":
         if w in pol:
             continue
         p = get_player(w); pol[w] = (lambda p: lambda g: p.decide(g)[0])(p)
+    run = Run("2048", games=n, players=which)
+    print(f"run {run.id}")
     for name, p in pol.items():
         t = time.time(); r = [play(p, s) for s in range(n)]
+        run.result(name, games=n, avg_score=sum(x[0] for x in r)/n, best_tiles=[x[1] for x in r], seconds=round(time.time()-t), scores=[x[0] for x in r])
         print(f"{name:7s} avg score {sum(x[0] for x in r)/n:7.0f}  best tile {[x[1] for x in r]}  {time.time()-t:.0f}s", flush=True)

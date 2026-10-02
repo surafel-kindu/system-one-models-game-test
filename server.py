@@ -37,6 +37,7 @@ import enginedino
 import engineflappy
 import enginesudoku
 from models import get_backend
+from runs import load_runs
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 GAMES = {"2048": engine2048, "dino": enginedino, "chess": enginechess, "flappy": engineflappy,
@@ -148,6 +149,14 @@ class H(BaseHTTPRequestHandler):
             return self._page(PAGES[(parts[0], "arena")])
         if len(parts) == 2 and parts[0] in GAMES and parts[1] == "play":
             return self._page(PAGES[(parts[0], "play")])
+        if path == "/benchmarks":
+            return self._page("benchmarks.html")
+        if parts[:2] == ["api", "benchmarks"]:
+            runs = load_runs()
+            if len(parts) == 3:
+                run = next((r for r in runs if r["run_id"] == parts[2]), None)
+                return self._send(run) if run else self.send_error(404)
+            return self._send([{**r, "results": len(r["results"])} for r in runs])
         if len(parts) == 5 and parts[0] == "api" and parts[1] == "chess" and parts[2] == "matches" and parts[4] == "candidates":
             return self._match_candidates(GAMES["chess"], parts[3])
         if len(parts) == 3 and parts[0] == "api" and parts[1] in GAMES:

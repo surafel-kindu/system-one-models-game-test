@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Benchmarks</title>
+<link rel=stylesheet href="/style.css">
+<style>
+.runs{display:grid;grid-template-columns:minmax(0,300px) minmax(0,1fr);gap:16px}
+@media(max-width:800px){.runs{grid-template-columns:minmax(0,1fr)}}
+.run{padding:8px 10px;border:1px solid var(--line);border-radius:8px;margin-bottom:6px;cursor:pointer;font-size:13px;background:var(--bg)}
+.run.on{border-color:var(--accent);background:var(--panel)}
+.run small{color:var(--muted);display:block}
+.run b{font-family:monospace;font-size:12px}
+.tag{display:inline-block;padding:1px 7px;border-radius:10px;font-size:11px;background:var(--panel);border:1px solid var(--line);margin-right:4px}
+</style>
+<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a><a href="/flappy">Flappy</a><a href="/sudoku">Sudoku</a></div>
+<div class=modes><a class=on href="/benchmarks">Benchmarks</a><a href="/traces">Traces</a></div></nav>
+<main>
+<h1>Benchmarks</h1>
+<p class=sub>Every headless run (<code>python bench_*.py</code>) is saved as one run; pick a run to see its ranked results.</p>
+<div class=runs>
+  <div class=panel>
+    <h2>Runs</h2>
+    <label style="font-size:14px">Game <select id=fgame><option value="">All</option></select></label>
+    <div id=list style="margin-top:10px"><div class=empty>Loading…</div></div>
+  </div>
+  <div id=detail><div class=panel><div class=empty>Select a run.</div></div></div>
+</div>
+</main>
+<script>
+const $=id=>document.getElementById(id);
+const PAL=['#f67c5f','#4c8dd6','#5aa469','#c98bd3','#e0a93b','#3fb8b0','#a0785a','#d9628b'];
+const colors={};const col=p=>colors[p]??=PAL[Object.keys(colors).length%PAL.length];
+const NAMES={laya:'Laya',jev:'Jev-BERTa',drex:'Drex',kev:'Kev-0.8B',gliner:'GLiNER2.5-Decide',bev:'Bev-Decider-0.4B',dm:'DecisionMaster'};
+const nm=p=>NAMES[p]||p;
+const esc=s=>String(s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const when=ts=>new Date(ts*1000).toLocaleString();
+const avg=a=>a&&a.length?a.reduce((x,y)=>x+y,0)/a.length:0;
+let runs=[],cur=null;
+
+// per-game: [column header, value fn(result)] after the common score bar column
+const COLS={
+  '2048':[['Best tiles',r=>(r.best_tiles||[]).join(', ')]],
+  dino:[['Obstacles cleared',r=>Math.round(avg(r.cleared))]],
+  flappy:[['Avg pipes',r=>avg(r.pipes).toFixed(1)],['Died on',r=>[...new Set(r.died_on||[])].join(', ')]],
+  sudoku:[['Solved',r=>r.solved+'/'+r.games],['Avg mistakes',r=>(+r.avg_mistakes).toFixed(2)],['Avg correct',r=>(+r.avg_correct).toFixed(1)]],
+};
+function chessView(run){
+  const sum=run.results.filter(r=>r.summary).sort((a,b)=>(b.wins-b.losses)-(a.wins-a.losses));
+  const games=run.results.filter(r=>!r.summary);
+  return `<div class=panel><h2>Standings</h2><div class=tbl><table><tr><th>Player<th>Wins<th>Losses<th>Draws</tr>`+
+    sum.map(r=>`<tr><td><span class=sw style="background:${col(r.player)}"></span>${nm(r.player)}<td><b>${r.wins}</b><td>${r.losses}<td>${r.draws}</tr>`).join('')+`</table></div></div>`+
+    `<div class=panel><h2>Games</h2><div class=tbl><table><tr><th>White<th>Black<th>Result<th>Reason<th>Plies</tr>`+
+    games.map(r=>`<tr><td>${nm(r.player)}<td>${nm(r.vs)}<td><b>${r.result}</b><td>${esc(r.reason)}<td>${r.plies}</tr>`).join('')+`</table></div></div>`;
+}
+function scoreView(run){
+  const rows=[...run.results].sort((a,b)=>b.avg_score-a.avg_score);
+  const top=Math.max(...rows.map(r=>r.avg_score),1);const cols=COLS[run.game]||[];
+  return `<div class=panel><h2>Results</h2><div class=tbl><table><tr><th>#<th>Player<th>Avg score<th><th>Best<th>Games${cols.map(c=>'<th>'+c[0]).join('')}<th>Time</tr>`+
+    rows.map((r,i)=>`<tr><td>${i+1}<td><span class=sw style="background:${col(r.player)}"></span>${nm(r.player)}<td><b>${Math.round(r.avg_score)}</b>
+    <td><div class="bar ${i==0?'best':''}"><i style="width:${r.avg_score/top*100}%"></i></div><td>${Math.max(...(r.scores||[0]))}<td>${r.games}${cols.map(c=>'<td>'+esc(c[1](r))).join('')}<td>${r.seconds}s</tr>`).join('')+`</table></div></div>`;
+}
+async function show(id){
+  cur=id;renderList();
+  const run=await (await fetch('/api/benchmarks/'+id)).json();
+  const p=run.params||{};
+  $('detail').innerHTML=`<div class=panel><h2>Run <code>${run.run_id}</code></h2><div class=sub style="margin:0">${when(run.ts)} · <span class=tag>${run.game}</span>`+
+    Object.entries(p).map(([k,v])=>`<span class=tag>${k}: ${esc([].concat(v).join(', '))}</span>`).join('')+`</div></div>`+
+    (run.results.length?(run.game=='chess'?chessView(run):scoreView(run)):'<div class=panel><div class=empty>No results recorded (run was interrupted).</div></div>');
+}
+function renderList(){
+  const g=$('fgame').value,rs=runs.filter(r=>!g||r.game==g);
+  $('list').innerHTML=rs.length?rs.map(r=>`<div class="run ${r.run_id==cur?'on':''}" data-id="${r.run_id}"><b>${r.run_id}</b><small><span class=tag>${r.game}</span>${when(r.ts)}</small><small>${esc((r.params.players||[]).join(', '))} · ${r.results} result${r.results==1?'':'s'}</small></div>`).join(''):'<div class=empty>No runs yet — run a bench script.</div>';
+  $('list').querySelectorAll('.run').forEach(e=>e.onclick=()=>show(e.dataset.id));
+}
+(async()=>{
+  runs=await (await fetch('/api/benchmarks')).json();
+  [...new Set(runs.map(r=>r.game))].forEach(g=>$('fgame').insertAdjacentHTML('beforeend',`<option>${g}</option>`));
+  $('fgame').onchange=renderList;renderList();
+  if(runs.length)show(runs[0].run_id);
+})();
+</script>
+</html>

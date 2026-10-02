@@ -7,3 +7,4 @@ nohup.out
 .env
 results_*.json
 traces.jsonl
+bench_runs.jsonl

@@ -519,3 +519,11 @@ running 14 games across 7 backends concurrently: 0 errors, server still up.
   other pages. If the game is adversarial or otherwise needs rules too complex to trust to JS,
   follow Chess's pattern: keep the authoritative state server-side (see `server.py`'s `MATCHES`)
   instead of 2048/Dino's client-side rule mirroring.
+
+## Benchmark runs & the Benchmarks page
+
+Every headless bench (`bench.py`, `bench_dino.py`, `bench_chess.py`, `bench_flappy.py`, `bench_sudoku.py`)
+creates one **run** (printed as `run <id>`) and saves each player's result under it in `bench_runs.jsonl`
+(see `runs.py`). Open **http://localhost:8048/benchmarks** to browse runs, filter by game, and see each run
+as a ranked table (score bars, game-specific columns; chess shows standings plus every game). The data is
+also at `GET /api/benchmarks` and `GET /api/benchmarks/<run_id>`.

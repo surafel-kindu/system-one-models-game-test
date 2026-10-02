@@ -1,0 +1,77 @@
+{"type":"run","run_id":"20261002-190058-a9d0","game":"sudoku","params":{"games":2,"players":["random","oracle"]},"ts":1790956858}
+{"type":"result","run_id":"20261002-190058-a9d0","game":"sudoku","player":"random","games":2,"avg_score":20,"solved":0,"avg_mistakes":3,"avg_correct":2,"seconds":0,"scores":[40,0]}
+{"type":"result","run_id":"20261002-190058-a9d0","game":"sudoku","player":"oracle","games":2,"avg_score":285,"solved":2,"avg_mistakes":0,"avg_correct":18.5,"seconds":0,"scores":[300,270]}
+{"type":"run","run_id":"20261002-193121-5b0f","game":"sudoku","params":{"games":5,"players":["laya","dm","jev","gliner","bev"]},"ts":1790958681}
+{"type":"result","run_id":"20261002-193121-5b0f","game":"sudoku","player":"laya","games":5,"avg_score":24,"solved":0,"avg_mistakes":3,"avg_correct":2.4,"seconds":3,"scores":[10,20,20,0,70]}
+{"type":"result","run_id":"20261002-193121-5b0f","game":"sudoku","player":"dm","games":5,"avg_score":8,"solved":0,"avg_mistakes":3,"avg_correct":0.8,"seconds":7,"scores":[10,10,10,10,0]}
+{"type":"result","run_id":"20261002-193121-5b0f","game":"sudoku","player":"jev","games":5,"avg_score":66,"solved":1,"avg_mistakes":2.8,"avg_correct":4.6,"seconds":10,"scores":[10,20,210,50,40]}
+{"type":"result","run_id":"20261002-193121-5b0f","game":"sudoku","player":"gliner","games":5,"avg_score":40,"solved":0,"avg_mistakes":3,"avg_correct":4,"seconds":13,"scores":[80,20,20,60,20]}
+{"type":"result","run_id":"20261002-193121-5b0f","game":"sudoku","player":"bev","games":5,"avg_score":0,"solved":0,"avg_mistakes":3,"avg_correct":0,"seconds":12,"scores":[0,0,0,0,0]}{"type": "run", "run_id": "20261002-210959-76e2", "game": "chess", "params": {"max_plies": 40, "players": ["random", "greedy"]}, "ts": 1790964599}
+{"type": "result", "run_id": "20261002-210959-76e2", "game": "chess", "player": "random", "vs": "greedy", "result": "1/2-1/2", "reason": "ply_limit", "plies": 40, "winner": null}
+{"type": "result", "run_id": "20261002-210959-76e2", "game": "chess", "player": "random", "summary": true, "wins": 0, "losses": 0, "draws": 1}
+{"type": "result", "run_id": "20261002-210959-76e2", "game": "chess", "player": "greedy", "summary": true, "wins": 0, "losses": 0, "draws": 1}
+{"type": "run", "run_id": "20261002-210959-6cea", "game": "dino", "params": {"games": 2, "players": ["random", "oracle"]}, "ts": 1790964599}
+{"type": "result", "run_id": "20261002-210959-6cea", "game": "dino", "player": "random", "games": 2, "avg_score": 5.0, "cleared": [1, 0], "seconds": 0, "scores": [10, 0]}
+{"type": "result", "run_id": "20261002-210959-6cea", "game": "dino", "player": "oracle", "games": 2, "avg_score": 3000.0, "cleared": [300, 300], "seconds": 0, "scores": [3000, 3000]}
+
+{"type": "run", "run_id": "20261002-214135-57f3", "game": "sudoku", "params": {"games": 10, "players": ["laya", "dm", "jev", "gliner", "bev"]}, "ts": 1790966495}
+
+{"type": "result", "run_id": "20261002-214135-57f3", "game": "sudoku", "player": "laya", "games": 10, "avg_score": 29.0, "solved": 1, "avg_mistakes": 2.8, "avg_correct": 1.9, "seconds": 5, "scores": [10, 20, 20, 0, 70, 20, 130, 10, 10, 0]}
+
+{"type": "result", "run_id": "20261002-214135-57f3", "game": "sudoku", "player": "dm", "games": 10, "avg_score": 26.0, "solved": 1, "avg_mistakes": 2.9, "avg_correct": 1.6, "seconds": 15, "scores": [10, 10, 10, 10, 0, 40, 120, 20, 10, 30]}
+
+{"type": "result", "run_id": "20261002-214135-57f3", "game": "sudoku", "player": "jev", "games": 10, "avg_score": 55.0, "solved": 2, "avg_mistakes": 2.8, "avg_correct": 3.5, "seconds": 18, "scores": [10, 20, 210, 50, 40, 0, 120, 40, 40, 20]}
+
+{"type": "result", "run_id": "20261002-214135-57f3", "game": "sudoku", "player": "gliner", "games": 10, "avg_score": 48.0, "solved": 1, "avg_mistakes": 2.8, "avg_correct": 3.8, "seconds": 25, "scores": [80, 20, 20, 60, 20, 20, 130, 30, 30, 70]}
+
+{"type": "result", "run_id": "20261002-214135-57f3", "game": "sudoku", "player": "bev", "games": 10, "avg_score": 1.0, "solved": 0, "avg_mistakes": 3.0, "avg_correct": 0.1, "seconds": 11, "scores": [0, 0, 0, 0, 0, 10, 0, 0, 0, 0]}
+
+{"type": "run", "run_id": "20261002-214806-5773", "game": "chess", "params": {"max_plies": 20, "players": ["laya", "dm", "jev", "gliner", "bev"]}, "ts": 1790966886}
+
+{"type": "run", "run_id": "20261002-214940-c7c9", "game": "chess", "params": {"max_plies": 20, "players": ["laya", "dm", "jev", "gliner", "bev"]}, "ts": 1790966980}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "laya", "vs": "dm", "result": "1/2-1/2", "reason": "ply_limit", "plies": 20, "winner": null}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "laya", "vs": "jev", "result": "1/2-1/2", "reason": "ply_limit", "plies": 20, "winner": null}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "laya", "vs": "gliner", "result": "1/2-1/2", "reason": "ply_limit", "plies": 20, "winner": null}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "laya", "vs": "bev", "result": "1/2-1/2", "reason": "ply_limit", "plies": 20, "winner": null}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "dm", "vs": "jev", "result": "1/2-1/2", "reason": "ply_limit", "plies": 20, "winner": null}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "dm", "vs": "gliner", "result": "1/2-1/2", "reason": "ply_limit", "plies": 20, "winner": null}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "dm", "vs": "bev", "result": "1/2-1/2", "reason": "ply_limit", "plies": 20, "winner": null}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "jev", "vs": "gliner", "result": "1/2-1/2", "reason": "ply_limit", "plies": 20, "winner": null}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "jev", "vs": "bev", "result": "1/2-1/2", "reason": "ply_limit", "plies": 20, "winner": null}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "gliner", "vs": "bev", "result": "1/2-1/2", "reason": "ply_limit", "plies": 20, "winner": null}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "laya", "summary": true, "wins": 0, "losses": 0, "draws": 4}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "dm", "summary": true, "wins": 0, "losses": 0, "draws": 4}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "jev", "summary": true, "wins": 0, "losses": 0, "draws": 4}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "gliner", "summary": true, "wins": 0, "losses": 0, "draws": 4}
+
+{"type": "result", "run_id": "20261002-214940-c7c9", "game": "chess", "player": "bev", "summary": true, "wins": 0, "losses": 0, "draws": 4}
+
+{"type": "run", "run_id": "20261002-215834-c1a9", "game": "2048", "params": {"games": 20, "players": ["laya", "dm", "jev", "gliner", "bev"]}, "ts": 1790967514}
+
+{"type": "result", "run_id": "20261002-215834-c1a9", "game": "2048", "player": "random", "games": 20, "avg_score": 1138.0, "best_tiles": [128, 64, 128, 64, 64, 64, 64, 128, 64, 256, 128, 128, 64, 128, 128, 64, 128, 128, 128, 128], "seconds": 0, "scores": [1172, 940, 1212, 576, 864, 588, 912, 1304, 636, 2336, 1340, 1088, 780, 1544, 1268, 952, 1220, 996, 1552, 1480]}
+
+{"type": "result", "run_id": "20261002-215834-c1a9", "game": "2048", "player": "greedy", "games": 20, "avg_score": 3270.6, "best_tiles": [256, 256, 256, 512, 256, 256, 256, 128, 512, 128, 512, 128, 256, 128, 64, 256, 256, 512, 256, 256], "seconds": 0, "scores": [3736, 2612, 3840, 5624, 3588, 3292, 2520, 1532, 5616, 1868, 5732, 1720, 3860, 1960, 912, 2484, 2668, 5484, 2520, 3844]}
+
+{"type": "result", "run_id": "20261002-215834-c1a9", "game": "2048", "player": "laya", "games": 20, "avg_score": 1089.6, "best_tiles": [128, 128, 32, 128, 64, 256, 64, 64, 64, 128, 128, 32, 128, 64, 64, 32, 64, 64, 128, 128], "seconds": 205, "scores": [1252, 1944, 504, 988, 652, 2024, 676, 1256, 692, 1600, 1460, 240, 1684, 608, 900, 600, 792, 716, 1316, 1888]}
+
+{"type": "result", "run_id": "20261002-215834-c1a9", "game": "2048", "player": "dm", "games": 20, "avg_score": 998.2, "best_tiles": [64, 128, 32, 128, 128, 64, 32, 64, 256, 64, 128, 32, 64, 128, 128, 32, 64, 64, 64, 64], "seconds": 690, "scores": [924, 1020, 580, 1524, 940, 1080, 372, 548, 2296, 704, 1504, 476, 1240, 1428, 1316, 616, 824, 668, 636, 1268]}
+
+{"type": "result", "run_id": "20261002-215834-c1a9", "game": "2048", "player": "jev", "games": 20, "avg_score": 800.2, "best_tiles": [128, 64, 64, 64, 128, 128, 64, 32, 64, 64, 32, 64, 64, 64, 128, 32, 16, 32, 64, 64], "seconds": 367, "scores": [1600, 812, 556, 864, 1332, 1060, 784, 392, 776, 856, 448, 732, 928, 548, 1424, 384, 244, 616, 692, 956]}
+
+{"type": "result", "run_id": "20261002-215834-c1a9", "game": "2048", "player": "gliner", "games": 20, "avg_score": 1109.8, "best_tiles": [64, 128, 64, 64, 64, 64, 64, 64, 32, 32, 256, 64, 64, 64, 64, 256, 128, 128, 128, 128], "seconds": 693, "scores": [548, 1428, 1176, 1356, 1004, 844, 572, 572, 408, 320, 2260, 1120, 852, 576, 984, 2724, 1364, 1348, 1356, 1384]}
+
+{"type": "result", "run_id": "20261002-215834-c1a9", "game": "2048", "player": "bev", "games": 20, "avg_score": 992.2, "best_tiles": [64, 64, 32, 64, 128, 128, 64, 128, 64, 64, 32, 128, 16, 64, 32, 256, 64, 64, 128, 128], "seconds": 284, "scores": [1040, 732, 232, 732, 1552, 976, 728, 1392, 692, 1164, 424, 1756, 236, 936, 308, 2824, 840, 772, 1060, 1448]}
