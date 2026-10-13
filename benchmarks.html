@@ -17,7 +17,7 @@
 <div class=modes><a class=on href="/benchmarks">Benchmarks</a><a href="/traces">Traces</a></div></nav>
 <main>
 <h1>Benchmarks</h1>
-<p class=sub>Every headless run (<code>python bench_*.py</code>) is saved as one run; pick a run to see its ranked results.</p>
+<p class=sub>Every headless run (<code>python benchmark.py</code> or <code>bench_*.py</code>) is saved as one run; pick a run to see its ranked results.</p>
 <div class=runs>
   <div class=panel>
     <h2>Runs</h2>
@@ -43,7 +43,8 @@ const COLS={
   '2048':[['Best tiles',r=>(r.best_tiles||[]).join(', ')]],
   dino:[['Obstacles cleared',r=>Math.round(avg(r.cleared))]],
   flappy:[['Avg pipes',r=>avg(r.pipes).toFixed(1)],['Died on',r=>[...new Set(r.died_on||[])].join(', ')]],
-  sudoku:[['Solved',r=>r.solved+'/'+r.games],['Avg mistakes',r=>(+r.avg_mistakes).toFixed(2)],['Avg correct',r=>(+r.avg_correct).toFixed(1)]],
+  overall:[['Per game',r=>Object.entries(r.per_game||{}).map(([g,v])=>g+' '+Math.round(v)).join(' · ')]],
+  sudoku:[['Solved',r=>Math.round((r.avg_solved??r.solved/r.games)*r.games)+'/'+r.games],['Avg mistakes',r=>(+(r.avg_mistakes??0)).toFixed(2)],['Avg correct',r=>(+(r.avg_correct??0)).toFixed(1)]],
 };
 function chessView(run){
   const sum=run.results.filter(r=>r.summary).sort((a,b)=>(b.wins-b.losses)-(a.wins-a.losses));
@@ -53,12 +54,19 @@ function chessView(run){
     `<div class=panel><h2>Games</h2><div class=tbl><table><tr><th>White<th>Black<th>Result<th>Reason<th>Plies</tr>`+
     games.map(r=>`<tr><td>${nm(r.player)}<td>${nm(r.vs)}<td><b>${r.result}</b><td>${esc(r.reason)}<td>${r.plies}</tr>`).join('')+`</table></div></div>`;
 }
-function scoreView(run){
+function scoreView(run,title){
   const rows=[...run.results].sort((a,b)=>b.avg_score-a.avg_score);
-  const top=Math.max(...rows.map(r=>r.avg_score),1);const cols=COLS[run.game]||[];
-  return `<div class=panel><h2>Results</h2><div class=tbl><table><tr><th>#<th>Player<th>Avg score<th><th>Best<th>Games${cols.map(c=>'<th>'+c[0]).join('')}<th>Time</tr>`+
+  const top=Math.max(...rows.map(r=>r.avg_score),1);const cols=[...(COLS[run.game]||[])];
+  if(rows[0]&&rows[0].win_share!==undefined&&run.game!='overall')cols.push(['Win share',r=>Math.round(r.win_share*100)+'%'],['Points rate',r=>Math.round(r.points_rate*100)+'%']);
+  if(rows[0]&&rows[0].std!==undefined)cols.unshift(['Std',r=>Math.round(r.std)],['Median',r=>Math.round(r.median)]);
+  return `<div class=panel><h2>${title||'Results'}</h2><div class=tbl><table><tr><th>#<th>Player<th>Avg score<th><th>Best<th>Games${cols.map(c=>'<th>'+c[0]).join('')}<th>Time</tr>`+
     rows.map((r,i)=>`<tr><td>${i+1}<td><span class=sw style="background:${col(r.player)}"></span>${nm(r.player)}<td><b>${Math.round(r.avg_score)}</b>
-    <td><div class="bar ${i==0?'best':''}"><i style="width:${r.avg_score/top*100}%"></i></div><td>${Math.max(...(r.scores||[0]))}<td>${r.games}${cols.map(c=>'<td>'+esc(c[1](r))).join('')}<td>${r.seconds}s</tr>`).join('')+`</table></div></div>`;
+    <td><div class="bar ${i==0?'best':''}"><i style="width:${r.avg_score/top*100}%"></i></div><td>${r.scores?Math.max(...r.scores):'–'}<td>${r.games}${cols.map(c=>'<td>'+esc(c[1](r))).join('')}<td>${r.seconds}s</tr>`).join('')+`</table></div></div>`;
+}
+function multiView(run){
+  const by={};run.results.forEach(r=>(by[r.game]??=[]).push(r));
+  const names=Object.keys(by).sort((a,b)=>(b=='overall')-(a=='overall'));   // overall leaderboard first
+  return names.map(g=>g=='chess'?chessView({game:g,results:by[g]}):scoreView({game:g,results:by[g]},g=='overall'?'Overall leaderboard':g)).join('');
 }
 async function show(id){
   cur=id;renderList();
@@ -66,7 +74,7 @@ async function show(id){
   const p=run.params||{};
   $('detail').innerHTML=`<div class=panel><h2>Run <code>${run.run_id}</code></h2><div class=sub style="margin:0">${when(run.ts)} · <span class=tag>${run.game}</span>`+
     Object.entries(p).map(([k,v])=>`<span class=tag>${k}: ${esc([].concat(v).join(', '))}</span>`).join('')+`</div></div>`+
-    (run.results.length?(run.game=='chess'?chessView(run):scoreView(run)):'<div class=panel><div class=empty>No results recorded (run was interrupted).</div></div>');
+    (run.results.length?(run.game=='multi'?multiView(run):run.game=='chess'?chessView(run):scoreView(run)):'<div class=panel><div class=empty>No results recorded (run was interrupted).</div></div>');
 }
 function renderList(){
   const g=$('fgame').value,rs=runs.filter(r=>!g||r.game==g);

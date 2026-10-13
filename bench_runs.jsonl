@@ -75,3 +75,42 @@
 {"type": "result", "run_id": "20261002-215834-c1a9", "game": "2048", "player": "gliner", "games": 20, "avg_score": 1109.8, "best_tiles": [64, 128, 64, 64, 64, 64, 64, 64, 32, 32, 256, 64, 64, 64, 64, 256, 128, 128, 128, 128], "seconds": 693, "scores": [548, 1428, 1176, 1356, 1004, 844, 572, 572, 408, 320, 2260, 1120, 852, 576, 984, 2724, 1364, 1348, 1356, 1384]}
 
 {"type": "result", "run_id": "20261002-215834-c1a9", "game": "2048", "player": "bev", "games": 20, "avg_score": 992.2, "best_tiles": [64, 64, 32, 64, 128, 128, 64, 128, 64, 64, 32, 128, 16, 64, 32, 256, 64, 64, 128, 128], "seconds": 284, "scores": [1040, 732, 232, 732, 1552, 976, 728, 1392, 692, 1164, 424, 1756, 236, 936, 308, 2824, 840, 772, 1060, 1448]}
+
+{"type": "run", "run_id": "20261014-012240-3d57", "game": "multi", "params": {"format": "versus", "games": 4, "rounds": 1, "seed": 0, "players": ["random", "greedy", "oracle"], "suites": ["2048", "dino", "flappy", "sudoku", "chess"]}, "ts": 1791930160}
+
+{"type": "result", "run_id": "20261014-012240-3d57", "game": "2048", "player": "random", "format": "versus", "games": 4, "avg_score": 1065, "std": 214.4644492684044, "median": 1090.0, "min": 748, "max": 1332, "win_share": 0.0, "points_rate": 0.0, "seconds": 0, "scores": [1016, 748, 1164, 1332], "avg_best_tile": 112.0, "avg_moves": 113.5}
+
+{"type": "result", "run_id": "20261014-012240-3d57", "game": "2048", "player": "greedy", "format": "versus", "games": 4, "avg_score": 3953, "std": 1078.236986937473, "median": 3788.0, "min": 2612, "max": 5624, "win_share": 1.0, "points_rate": 1.0, "seconds": 0, "scores": [3736, 2612, 3840, 5624], "avg_best_tile": 320.0, "avg_moves": 314.75}
+
+{"type": "result", "run_id": "20261014-012240-3d57", "game": "dino", "player": "random", "format": "versus", "games": 4, "avg_score": 12.5, "std": 10.897247358851684, "median": 10.0, "min": 0, "max": 30, "win_share": 0.0, "points_rate": 0.0, "seconds": 0, "scores": [0, 30, 10, 10], "avg_cleared": 1.25}
+
+{"type": "result", "run_id": "20261014-012240-3d57", "game": "dino", "player": "oracle", "format": "versus", "games": 4, "avg_score": 3000, "std": 0.0, "median": 3000.0, "min": 3000, "max": 3000, "win_share": 1.0, "points_rate": 1.0, "seconds": 0, "scores": [3000, 3000, 3000, 3000], "avg_cleared": 300.0}
+
+{"type": "result", "run_id": "20261014-012240-3d57", "game": "flappy", "player": "random", "format": "versus", "games": 4, "avg_score": 0, "std": 0.0, "median": 0.0, "min": 0, "max": 0, "win_share": 0.0, "points_rate": 0.0, "seconds": 0, "scores": [0, 0, 0, 0], "avg_pipes": 0.0}
+
+{"type": "result", "run_id": "20261014-012240-3d57", "game": "flappy", "player": "greedy", "format": "versus", "games": 4, "avg_score": 47.5, "std": 32.69174207655505, "median": 50.0, "min": 10, "max": 80, "win_share": 0.0, "points_rate": 0.5, "seconds": 0, "scores": [80, 20, 10, 80], "avg_pipes": 4.75}
+
+{"type": "result", "run_id": "20261014-012240-3d57", "game": "flappy", "player": "oracle", "format": "versus", "games": 4, "avg_score": 3000, "std": 0.0, "median": 3000.0, "min": 3000, "max": 3000, "win_share": 1.0, "points_rate": 1.0, "seconds": 0, "scores": [3000, 3000, 3000, 3000], "avg_pipes": 300.0}
+
+{"type": "run", "run_id": "20261014-012246-d2e2", "game": "multi", "params": {"format": "round-robin", "games": 6, "rounds": 1, "seed": 0, "players": ["random", "greedy", "oracle"], "suites": ["sudoku", "chess"]}, "ts": 1791930166}
+
+{"type": "result", "run_id": "20261014-012246-d2e2", "game": "sudoku", "player": "random", "format": "round-robin", "games": 6, "avg_score": 20, "std": 19.148542155126762, "median": 15.0, "min": 0, "max": 50, "win_share": 0.0, "points_rate": 0.0, "seconds": 0, "scores": [40, 0, 0, 50, 20, 10], "avg_correct": 2.0, "avg_mistakes": 3.0, "avg_solved": 0.0}
+
+{"type": "result", "run_id": "20261014-012246-d2e2", "game": "sudoku", "player": "greedy", "format": "round-robin", "games": 6, "avg_score": 250, "std": 33.665016461206925, "median": 260.0, "min": 200, "max": 290, "win_share": 0.25, "points_rate": 0.625, "seconds": 0, "scores": [290, 260, 210, 280, 260, 200], "avg_correct": 15.0, "avg_mistakes": 0.5, "avg_solved": 1.0}
+
+{"type": "result", "run_id": "20261014-012246-d2e2", "game": "sudoku", "player": "oracle", "format": "round-robin", "games": 6, "avg_score": 255, "std": 36.85557397915997, "median": 270.0, "min": 200, "max": 300, "win_share": 0.75, "points_rate": 0.875, "seconds": 0, "scores": [300, 270, 210, 280, 270, 200], "avg_correct": 15.5, "avg_mistakes": 0.0, "avg_solved": 1.0}
+
+{"type": "result", "run_id": "20261014-012246-d2e2", "game": "chess", "player": "random", "vs": "greedy", "result": "0-1", "reason": "checkmate", "plies": 60, "winner": "greedy"}
+
+{"type": "result", "run_id": "20261014-012246-d2e2", "game": "chess", "player": "greedy", "vs": "random", "result": "1/2-1/2", "reason": "ply_limit", "plies": 60, "winner": null}
+
+{"type": "result", "run_id": "20261014-012246-d2e2", "game": "chess", "player": "random", "summary": true, "wins": 0, "losses": 1, "draws": 1, "points_rate": 0.25, "seconds": 0}
+
+{"type": "result", "run_id": "20261014-012246-d2e2", "game": "chess", "player": "greedy", "summary": true, "wins": 1, "losses": 0, "draws": 1, "points_rate": 0.75, "seconds": 0}
+
+{"type": "result", "run_id": "20261014-012246-d2e2", "game": "overall", "player": "greedy", "avg_score": 68.75, "games": 2, "seconds": 0, "per_game": {"sudoku": 62.5, "chess": 75.0}}
+
+{"type": "result", "run_id": "20261014-012246-d2e2", "game": "overall", "player": "oracle", "avg_score": 87.5, "games": 2, "seconds": 0, "per_game": {"sudoku": 87.5}}
+
+{"type": "result", "run_id": "20261014-012246-d2e2", "game": "overall", "player": "random", "avg_score": 12.5, "games": 2, "seconds": 0, "per_game": {"sudoku": 0.0, "chess": 25.0}}
+

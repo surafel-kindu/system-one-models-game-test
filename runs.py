@@ -10,12 +10,15 @@ FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "bench_runs.json
 
 
 class Run:
-    def __init__(self, game, **params):
+    def __init__(self, game, save=True, **params):
+        self.save = save
         self.id = time.strftime("%Y%m%d-%H%M%S-") + uuid.uuid4().hex[:4]
         self.game = game
         self._write({"type": "run", "run_id": self.id, "game": game, "params": params, "ts": int(time.time())})
 
     def _write(self, rec):
+        if not self.save:
+            return
         with _lock, open(FILE, "a") as f:   # one write per record, so concurrent benches can't interleave
             f.write("\n" + json.dumps(rec) + "\n")
 

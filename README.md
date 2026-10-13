@@ -113,6 +113,10 @@ Drex.
 
 ## Running the benchmarks (headless, no browser)
 
+> **Full guide: [BENCHMARKING.md](BENCHMARKING.md)** — the unified `benchmark.py` runner with competition formats
+> (`average`, `versus`, `round-robin`) and multi-game suites with an overall leaderboard. The per-game scripts below
+> are the simple way to run one comparison.
+
 Each game has a small script that plays many games with no server and no browser — the quickest
 way to compare players. Run them from the activated venv, from this directory:
 
@@ -139,7 +143,7 @@ count (2048/Dino) or the max-plies cutoff (Chess). Unlike the web UI, these scri
 availability first — naming `drex` without `DREX_API_KEY` set, or `kev` without its server running,
 raises an error immediately and stops the whole run rather than skipping just that player.
 
-Results print as plain text to the terminal — nothing is written to disk. This is separate from
+Results print as plain text to the terminal; the `bench_*.py` scripts also record each run to `bench_runs.jsonl` (see [Benchmark runs & the Benchmarks page](#benchmark-runs--the-benchmarks-page)). This is separate from
 the Arena's saved `results_*.json` and the [Traces](#traces) log, which only capture games played
 through the web UI.
 
@@ -481,6 +485,8 @@ running 14 games across 7 backends concurrently: 0 errors, server still up.
 | `style.css` | Shared design for every page |
 | `.env.example` | Template for your API key (copy to `.env`) |
 | `results_<game>.json` | Saved arena results per game (created on first finish, git-ignored) |
+| `benchmark.py` | Unified headless runner: any game(s) × any players, with `average` / `versus` / `round-robin` formats and an overall leaderboard — see [BENCHMARKING.md](BENCHMARKING.md) |
+| `runs.py`, `benchmarks.html` | Run grouping for saved bench results (`bench_runs.jsonl`) and the `/benchmarks` page |
 | `bench.py` / `bench_dino.py` / `bench_chess.py` / `bench_flappy.py` / `bench_sudoku.py` | Headless benchmarks against each game's baselines |
 
 ## Notes
