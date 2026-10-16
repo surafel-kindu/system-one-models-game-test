@@ -2,33 +2,6 @@
   "run_id": "20261016-145713-290d",
   "records": [
     {
-      "type": "run",
-      "run_id": "20261016-145713-290d",
-      "game": "multi",
-      "params": {
-        "format": "average",
-        "games": 2,
-        "rounds": 1,
-        "max_plies": 200,
-        "seed": 42,
-        "players": [
-          "random",
-          "greedy",
-          "oracle"
-        ],
-        "control": "assisted",
-        "versions": {
-          "dino": "arcade-v2",
-          "flappy": "arcade-v2"
-        },
-        "suites": [
-          "dino",
-          "flappy"
-        ]
-      },
-      "ts": 1792151833
-    },
-    {
       "type": "checkpoint",
       "run_id": "20261016-145713-290d",
       "game": "dino",
