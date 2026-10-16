@@ -10,3 +10,4 @@ docs
 suggestions*.json
 exports
 *.sqlite3*
+.social-tools

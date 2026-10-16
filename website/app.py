@@ -12,6 +12,7 @@ from werkzeug.utils import secure_filename
 from benchmarks import BenchmarkIndex, filtered_runs, summary
 from catalog import GAMES, MODELS, NAMES, lettering
 from submissions import SubmissionStore, ValidationError, valid_url, validate
+from presentation import page_metadata
 
 BASE = Path(__file__).resolve().parent
 
@@ -42,7 +43,13 @@ def create_app(config=None):
 
     @app.context_processor
     def shared():
-        return dict(repo=app.config['REPOSITORY_URL'], games=GAMES, models=MODELS, names=NAMES,
+        seo = page_metadata(request.endpoint, request.values.get('kind', 'model'))
+        origin = (app.config['PUBLIC_URL'] or request.url_root).rstrip('/')
+        seo.update(canonical=origin + seo['path'],
+                   image=origin + url_for('static', filename=f"social/{seo['key']}-v2.jpg"),
+                   image_alt=f"Model Arcade Lab — {seo['title']}. {seo['caption']}",
+                   indexable=seo['public'] and request.method == 'GET' and request.endpoint != 'missing')
+        return dict(repo=app.config['REPOSITORY_URL'], games=GAMES, models=MODELS, names=NAMES, seo=seo,
                     lettering=lambda word:Markup(lettering(word)))
 
     @app.after_request

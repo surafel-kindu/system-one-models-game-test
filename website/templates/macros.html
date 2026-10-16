@@ -1,5 +1,5 @@
 {% macro heading(word, title, kicker, description) %}
-<header class="page-heading"><div class="eyebrow topline"><span>{{ kicker }}</span><span>MODEL ARCADE / OPEN RESEARCH</span></div><h1 class="vector-heading"><span class="sr-only">{{ title }}</span>{{ lettering(word) }}</h1><div class="heading-description"><span class="square" aria-hidden="true"></span><p>{{ description }}</p><span class="heading-arrow" aria-hidden="true">↗</span></div></header>
+<header class="page-heading"><div class="page-heading-copy"><div class="eyebrow">{{ kicker }}</div><h1 class="vector-heading"><span class="sr-only">{{ title }}</span>{{ lettering(word) }}</h1><p class="heading-description">{{ description }}</p><a class="heading-source" href="{{ repo }}" target="_blank" rel="noopener noreferrer">MODEL ARCADE LAB / OPEN RESEARCH ↗</a></div><figure class="page-heading-art"><img src="{{ url_for('static',filename='illustrations/'+seo.key+'.svg') }}" width="800" height="520" alt="" fetchpriority="high"><figcaption>{{ seo.caption }}</figcaption></figure></header>
 {% endmacro %}
 {% macro code(text) %}<div class="code-block"><button type="button" class="copy-button" aria-label="Copy command">Copy</button><pre><code>{{ text }}</code></pre></div>{% endmacro %}
 {% macro game_art(game) %}

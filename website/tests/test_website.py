@@ -1,3 +1,5 @@
+from html.parser import HTMLParser
+from urllib.parse import urlsplit
 import concurrent.futures
 import json
 from pathlib import Path
@@ -107,6 +109,56 @@ class SiteTests(unittest.TestCase):
         for path in ('/','/benchmarks','/project','/contribute','/submit','/submit?kind=game','/static/site.css','/static/benchmarks.js','/healthz'):
             with self.subTest(path=path):
                 with self.client.get(path) as response:self.assertEqual(response.status_code,200)
+    @staticmethod
+    def page_head(response):
+        class Head(HTMLParser):
+            def __init__(self):
+                super().__init__();self.meta={};self.links={}
+            def handle_starttag(self,tag,attrs):
+                attrs=dict(attrs)
+                if tag=='meta':self.meta[attrs.get('property',attrs.get('name',''))]=attrs.get('content','')
+                elif tag=='link':self.links[attrs.get('rel','')]=attrs.get('href','')
+        head=Head();head.feed(response.get_data(as_text=True));return head
+    def test_public_pages_have_distinct_server_rendered_share_cards(self):
+        app=create_app(self.config|{'PUBLIC_URL':'https://arcade.afroawi.com'})
+        client=app.test_client();titles=set();images=set()
+        pages=[('/', '/'),('/benchmarks?game=dino&run=arbitrary','/benchmarks'),
+               ('/project','/project'),('/contribute','/contribute'),
+               ('/submit?kind=model','/submit'),('/submit?kind=game','/submit?kind=game')]
+        for path,canonical in pages:
+            with self.subTest(path=path):
+                response=client.get(path,headers={'Host':'spoofed.example'})
+                head=self.page_head(response);meta=head.meta
+                self.assertEqual(response.status_code,200)
+                self.assertEqual(head.links['canonical'],'https://arcade.afroawi.com'+canonical)
+                self.assertEqual(meta['og:url'],head.links['canonical'])
+                self.assertEqual(meta['og:type'],'website')
+                self.assertEqual(meta['og:site_name'],'Model Arcade Lab')
+                self.assertEqual(meta['twitter:card'],'summary_large_image')
+                self.assertEqual(meta['twitter:image'],meta['og:image'])
+                self.assertEqual(meta['description'],meta['og:description'])
+                self.assertEqual(meta['twitter:description'],meta['description'])
+                self.assertTrue(meta['og:image:alt']);self.assertTrue(meta['description'])
+                self.assertEqual(meta['og:image:width'],'1200');self.assertEqual(meta['og:image:height'],'630')
+                image=urlsplit(meta['og:image']);self.assertEqual(image.netloc,'arcade.afroawi.com')
+                with client.get(image.path) as asset:
+                    self.assertEqual(asset.status_code,200);self.assertEqual(asset.mimetype,'image/jpeg')
+                    self.assertTrue(asset.data.startswith(b'\xff\xd8\xff'));self.assertLess(len(asset.data),500000)
+                titles.add(meta['og:title']);images.add(meta['og:image'])
+        self.assertEqual(len(titles),6);self.assertEqual(len(images),6)
+    def test_share_metadata_follows_local_origin_without_public_url(self):
+        app=create_app(self.config|{'PUBLIC_URL':''});client=app.test_client()
+        head=self.page_head(client.get('/project',base_url='http://localhost:28482'))
+        self.assertEqual(head.links['canonical'],'http://localhost:28482/project')
+        self.assertTrue(head.meta['og:image'].startswith('http://localhost:28482/static/social/'))
+    def test_receipts_and_missing_pages_are_not_indexed(self):
+        head=self.page_head(self.client.get('/not-a-real-page'))
+        self.assertEqual(head.meta['robots'],'noindex, nofollow');self.assertNotIn('canonical',head.links)
+        payload=suggestion()|{'csrf':self.csrf()}
+        receipt=self.client.post('/submit',data=payload)
+        self.assertEqual(receipt.status_code,201)
+        head=self.page_head(receipt)
+        self.assertEqual(head.meta['robots'],'noindex, nofollow');self.assertNotIn('og:url',head.meta)
     def test_benchmark_filter_detail_download_and_not_found(self):
         self.assertEqual(len(self.client.get('/api/runs?game=dino&control=assisted').json['runs']),1)
         self.assertEqual(self.client.get('/api/runs?game=chess').json['runs'],[])

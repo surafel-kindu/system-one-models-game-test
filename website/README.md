@@ -4,7 +4,7 @@ A standalone, self-hosted project and benchmark site. Uses the arcade's gray gri
 
 ## Preview
 
-Real browser captures of the Docker-hosted site at 1280 px desktop and 390 px mobile viewports, taken on 2026-10-16. The homepage uses an illustrative 2048 grid. The benchmark screenshot shows the actual two-seed baseline demonstration, with versions, control, seed range, coverage, and ranked results.
+Real browser captures of the Docker-hosted site at 1920 px desktop and 390 px mobile viewports, taken on 2026-10-16. The homepage uses an illustration of all five games. The benchmark screenshot shows the actual two-seed baseline demonstration, with versions, control, seed range, coverage, and ranked results.
 
 <details>
 <summary>Homepage and project introduction</summary>
@@ -32,6 +32,25 @@ Real browser captures of the Docker-hosted site at 1280 px desktop and 390 px mo
 The site uses the supplied Model Arcade Lab artwork: the transparent horizontal logo in the shared header and footer, and the stacked logo on the homepage invitation card. The original PNGs are in `static/brand/`; they are copied without changing their pixels. CSS viewports remove their outer transparent margins while preserving the artwork's proportions.
 
 `static/favicon.svg` displays the mascot from the same horizontal PNG through an SVG viewport. The original image is embedded so the browser icon has no external-image dependency. If replacing the logo, update both PNGs and the embedded favicon.
+
+## Page headers and social previews
+
+The layout uses almost the full viewport width on large displays, with bounded prose columns for comfortable reading. Body copy uses a 16 px base size, darker secondary text, and larger navigation, form, and benchmark controls. Mobile tables scroll inside their panels.
+
+Each public page has a header illustration and its own **1200 × 630 JPEG** share image, including separate model/game suggestion cards. The shared HTML head includes a page title, description, canonical URL, Open Graph image/alt text/dimensions, and a large-image Twitter card. Metadata is server-rendered so crawlers do not need JavaScript. See the [Open Graph specification](https://ogp.me/).
+
+`PUBLIC_URL` supplies the absolute origin for canonical and image URLs; the production default is `https://arcade.afroawi.com`. Local previews fall back to their request origin when no public URL is configured. Benchmark filter/run parameters share the archive's canonical page; `/submit?kind=game` has its own card. Receipts and missing pages have `noindex` metadata.
+
+Copy and asset identities live in `presentation.py`, native illustrations in `static/illustrations/`, and prebuilt JPEGs in `static/social/`. Images are public static files served by the same Docker image. Deploy the rebuilt image for the new HTML and assets to become publicly accessible. Social platforms may retain previously fetched previews.
+
+To regenerate share JPEGs after changing their copy, brand logo, or illustrations, use the optional authoring utility (Node.js, Python 3, and Sharp are development tools only):
+
+```bash
+npm install --prefix .social-tools --no-save --package-lock=false sharp
+node tools/build_social_images.mjs
+```
+
+These dependencies are not needed to build or host the website; committed JPEGs are served directly. Versioned image filenames and the CSS query version make asset changes explicit.
 
 ## Start
 
@@ -232,11 +251,13 @@ The app uses the production server pattern described in [Flask's Gunicorn guide]
 website/
   compose.yaml / compose.https.yaml / Caddyfile
   Dockerfile / requirements.txt
-  app.py / benchmarks.py / catalog.py / submissions.py
+  app.py / benchmarks.py / catalog.py / presentation.py / submissions.py
   manage.py
   templates/                 five public pages and receipt/error views
   static/                    shared CSS, SVG art, client scripts, favicon
   static/brand/              supplied horizontal and stacked logo PNGs
+  static/illustrations/      page header SVG artwork
+  static/social/             prebuilt public JPEG share images
   benchmark-data/            mounted public benchmark files
   tools/import_benchmarks.py
   tests/test_website.py
