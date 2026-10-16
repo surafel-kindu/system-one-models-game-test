@@ -1,6 +1,3 @@
-{"type":"run","run_id":"20261002-190058-a9d0","game":"sudoku","params":{"games":2,"players":["random","oracle"]},"ts":1790956858}
-{"type":"result","run_id":"20261002-190058-a9d0","game":"sudoku","player":"random","games":2,"avg_score":20,"solved":0,"avg_mistakes":3,"avg_correct":2,"seconds":0,"scores":[40,0]}
-{"type":"result","run_id":"20261002-190058-a9d0","game":"sudoku","player":"oracle","games":2,"avg_score":285,"solved":2,"avg_mistakes":0,"avg_correct":18.5,"seconds":0,"scores":[300,270]}
 {"type":"run","run_id":"20261002-193121-5b0f","game":"sudoku","params":{"games":5,"players":["laya","dm","jev","gliner","bev"]},"ts":1790958681}
 {"type":"result","run_id":"20261002-193121-5b0f","game":"sudoku","player":"laya","games":5,"avg_score":24,"solved":0,"avg_mistakes":3,"avg_correct":2.4,"seconds":3,"scores":[10,20,20,0,70]}
 {"type":"result","run_id":"20261002-193121-5b0f","game":"sudoku","player":"dm","games":5,"avg_score":8,"solved":0,"avg_mistakes":3,"avg_correct":0.8,"seconds":7,"scores":[10,10,10,10,0]}
@@ -10,9 +7,6 @@
 {"type": "result", "run_id": "20261002-210959-76e2", "game": "chess", "player": "random", "vs": "greedy", "result": "1/2-1/2", "reason": "ply_limit", "plies": 40, "winner": null}
 {"type": "result", "run_id": "20261002-210959-76e2", "game": "chess", "player": "random", "summary": true, "wins": 0, "losses": 0, "draws": 1}
 {"type": "result", "run_id": "20261002-210959-76e2", "game": "chess", "player": "greedy", "summary": true, "wins": 0, "losses": 0, "draws": 1}
-{"type": "run", "run_id": "20261002-210959-6cea", "game": "dino", "params": {"games": 2, "players": ["random", "oracle"]}, "ts": 1790964599}
-{"type": "result", "run_id": "20261002-210959-6cea", "game": "dino", "player": "random", "games": 2, "avg_score": 5.0, "cleared": [1, 0], "seconds": 0, "scores": [10, 0]}
-{"type": "result", "run_id": "20261002-210959-6cea", "game": "dino", "player": "oracle", "games": 2, "avg_score": 3000.0, "cleared": [300, 300], "seconds": 0, "scores": [3000, 3000]}
 
 {"type": "run", "run_id": "20261002-214135-57f3", "game": "sudoku", "params": {"games": 10, "players": ["laya", "dm", "jev", "gliner", "bev"]}, "ts": 1790966495}
 
