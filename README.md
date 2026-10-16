@@ -23,6 +23,120 @@ answers against a context and return probabilities. None of the seven was traine
 games. Each is loaded **once** and shared between all five games (`models.py`), not duplicated
 per game.
 
+## Screenshots
+
+A visual walkthrough of the running app. Expand any example; click an image or its full-size link to inspect the details. These are real browser captures, with live decisions and results from local runs.
+
+<details open>
+<summary><strong>Flappy Bird — a model chooses a flight plan</strong></summary>
+
+![Flappy Bird with Jev-BERTa flight-plan probabilities, a dotted forecast, score, and expanded model context](docs/screenshots/flappy-decision.jpg)
+
+Jev-BERTa in **assisted** mode: the dotted line previews the chosen flight plan, probability bars compare the options, and the expanded context shows the text and trajectories sent to the model. Score, pipes cleared, model calls, and latency remain visible.
+
+[Open the full-size screenshot](docs/screenshots/flappy-decision.jpg).
+
+</details>
+
+<details>
+<summary><strong>Dino Run — compare players on one seeded course</strong></summary>
+
+![Three Dino Run players on seed 42 with live course views, scores, model calls, and leaderboards](docs/screenshots/dino-arena.jpg)
+
+Jev-BERTa, Greedy, and Oracle run side by side on **seed 42**. Each card shows its score, control, progress, and model-call count. Players advance at their own inference speed; the screenshot was taken while the model was still running and both baselines had finished.
+
+[Open the full-size screenshot](docs/screenshots/dino-arena.jpg).
+
+</details>
+
+<details>
+<summary><strong>2048 — inspect a move and its confidence</strong></summary>
+
+![2048 board beside move probabilities and the state text sent to Jev-BERTa](docs/screenshots/2048-decision.jpg)
+
+The board, score, move count, and largest tile appear beside the chosen direction, per-option probabilities, and the exact board description used for the decision.
+
+[Open the full-size screenshot](docs/screenshots/2048-decision.jpg).
+
+</details>
+
+<details>
+<summary><strong>Chess — follow a head-to-head match</strong></summary>
+
+![Greedy versus Jev-BERTa chess match with highlighted capture, move probabilities, board context, and history](docs/screenshots/chess-match.jpg)
+
+Greedy plays White against Jev-BERTa as Black. The highlighted squares show the bishop capture just played; the right column shows the mover’s probabilities and board context, with move history below the board.
+
+[Open the full-size screenshot](docs/screenshots/chess-match.jpg).
+
+</details>
+
+<details>
+<summary><strong>Sudoku — see automatic fills and a model placement</strong></summary>
+
+![Sudoku with a highlighted correct model placement, digit probabilities, score, mistakes, and context](docs/screenshots/sudoku-decision.jpg)
+
+Jev-BERTa correctly chooses digit **9** for row 6, column 4, after two earlier mistakes. The orange target cell, candidate probabilities, model context, mistake counter, and differently styled given/auto-filled/model-placed cells explain what happened in that step.
+
+[Open the full-size screenshot](docs/screenshots/sudoku-decision.jpg).
+
+</details>
+
+<details>
+<summary><strong>Benchmarks — inspect a saved comparison</strong></summary>
+
+![Saved Dino and Flappy benchmark with control mode, seed, overall standings, per-game statistics, and timing](docs/screenshots/benchmark-results.jpg)
+
+A completed Dino + Flappy run shows its players, **seed 42**, **assisted** control, game versions, overall leaderboard, per-game scores, model calls, and decision timing. This screenshot uses one seed to demonstrate the interface; use more seeds for performance comparisons.
+
+[Open the full-size screenshot](docs/screenshots/benchmark-results.jpg).
+
+</details>
+
+<details>
+<summary><strong>Traces — inspect the exact request and response</strong></summary>
+
+![Filtered Flappy decision trace with expanded request and response JSON](docs/screenshots/decision-traces.jpg)
+
+The trace browser is filtered to **Flappy / Jev-BERTa**, with one decision expanded. Request JSON, action probabilities, model context, selected flight plan, and latency can be inspected together. Live polling is paused to keep the view still.
+
+[Open the full-size screenshot](docs/screenshots/decision-traces.jpg).
+
+</details>
+
+<details>
+<summary><strong>Console — live progress and ranked results</strong></summary>
+
+Run the guided launcher with `./benchmark`, or repeat the recorded comparison:
+
+```bash
+./benchmark --game dino,flappy --players jev greedy oracle --games 1 --seed 42
+```
+
+Actual console-output excerpts from that run, shown as text rather than a native Terminal screenshot:
+
+```text
+/ ·················· 0/3  5s elapsed  dino/jev · seed 42 · step 28 · score 20
+```
+
+```text
+OVERALL LEADERBOARD · mean of per-game 0–100 points
+
+#  player  overall  dino  flappy
+-  ------  -------  ----  ------
+1     jev    100.0   100     100
+2  oracle    100.0   100     100
+3  greedy     51.0   100       2
+```
+
+The live line reports completed games, elapsed time, player, seed, step, and score; an ETA appears after a game has completed. The final tables rank each game and the overall suite. This is a one-seed assisted demonstration, not an estimate of unaided model ability.
+
+[Read the full console transcript](docs/screenshots/benchmark-output.txt).
+
+</details>
+
+Capture settings and reproduction steps are in [the screenshot guide](docs/screenshots/README.md).
+
 ## Quick start
 
 Requires Python 3.10+. The server starts immediately; each local model loads on its first decision.
@@ -45,6 +159,8 @@ page to switch game (**2048** / **Dino Run** / **Chess** / **Flappy** / **Sudoku
 | **Chess** | `/chess` — every pair plays each other | `/chess/play` — pick White and Black, one ply at a time |
 | **Flappy** | `/flappy` | `/flappy/play` — one tick at a time |
 | **Sudoku** | `/sudoku` — every board gets the same puzzle | `/sudoku/play` — one decision at a time |
+
+All five games share the same gray grid, geometric headings, sharp board cards, and orange controls in both modes. Single-game views pair the board with decision probabilities and an expandable model context; arenas show live cards and saved leaderboards.
 
 There's also <http://localhost:8048/traces> — every model decision across all five games, with filters (see [Traces](#traces) below).
 
@@ -371,7 +487,7 @@ time); **three mistakes end the game**. Score = 10 per correct decision, +100 fo
   That's a rule a model has to apply, not an answer handed over — which is exactly what's being measured.
 - **Server-authoritative, like Chess:** the solution lives on the server and is never sent to the
   browser (`POST /api/sudoku/games`, then `POST /api/sudoku/games/<id>/step`). Auto-filled cells show
-  grey, the model's correct placements tan, and a wrong guess flashes red.
+  grey, the model's correct placements orange, and a wrong guess highlights the target cell in red.
 
 **Baselines:** `random` (a random legal digit), `greedy` (applies the "0 elsewhere" rule literally —
 no model), `oracle` (reads the solution).
@@ -444,7 +560,8 @@ running 14 games across 7 backends concurrently: 0 errors, server still up.
 | `arena_flappy.html` / `play_flappy.html` | Flappy Bird arena and single-game pages |
 | `arena_sudoku.html` / `play_sudoku.html` | Sudoku arena (same puzzle per run) and single-game pages |
 | `style.css` | Shared base design |
-| `arcade.css`, `arcade.js` | Shared Dino/Flappy presentation, animation and controls (no game physics) |
+| `arcade.css` | Shared design for all five games and the benchmark browser |
+| `arcade.js` | Dino/Flappy animation and controls (no game physics) |
 | `benchmark`, `benchmark_console.py` | Venv-aware launcher and dependency-free terminal progress dashboard |
 | `tests/test_arcade.py` | Physics, model-control, API, persistence and benchmark regressions |
 | `.env.example` | Template for your API key (copy to `.env`) |

@@ -1,56 +1,42 @@
 <!doctype html>
 <html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sudoku Arena</title>
-<link rel=stylesheet href="/style.css">
-<style>
-#games{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:10px}
-.g{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
-.g.done{opacity:.8}
-.g .h{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}
-.g .f{font-size:11px;color:var(--muted);margin-top:5px;display:flex;justify-content:space-between}
-</style>
-<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a><a href="/flappy">Flappy</a><a class=on href="/sudoku">Sudoku</a></div>
-<div class=modes><a class=on href="/sudoku">Arena</a><a href="/sudoku/play">Single game</a><a href="/benchmarks">Benchmarks</a><a href="/traces">Traces</a></div></nav>
+<title>Sudoku · Arena · Model Arcade</title>
+<link rel="stylesheet" href="/arcade.css">
+</head>
+<body class="arcade board-page" data-game="sudoku" data-mode="arena">
+<div class="arcade-shell">
+<nav aria-label="Arcade navigation"><div class="games"><b class="brand"><span class="brand-mark" aria-hidden="true">··</span><span>MODEL<span class="brand-sub">ARCADE/LAB</span></span></b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a><a href="/flappy">Flappy</a><a class=on href="/sudoku">Sudoku</a></div>
+<div class="modes"><a class=on href="/sudoku">Arena</a><a href="/sudoku/play">Single game</a><a href="/benchmarks">Benchmarks</a><a href="/traces">Traces</a></div></nav>
 <main>
-<h1>Sudoku Arena</h1>
-<p class=sub>Run many games at once, compare players, and keep high scores.</p>
-<p class=legend>Every board in a run gets the <b>same puzzle</b> (regenerated on each Start), so a lucky puzzle
-doesn't favor one player. Forced cells are filled automatically; each model decision picks the digit for the
-next cell that needs one. A wrong digit is a mistake; three end the game. Score = 10 per correct decision, +100 for solving.</p>
-
-<div class=panel>
-  <div class=ctl>
-    <span id=players>Loading players…</span>
-    <label>Games per player <input type=number id=n value=3 min=1 max=20></label>
-    <button id=start>Start</button><button id=stop class=ghost disabled>Stop</button>
-    <button id=clear class=ghost title="Remove board cards from the page (saved results stay)">Clear boards</button>
-    <span id=status class=sub style="margin:0"></span>
-  </div>
-</div>
-
-<div class=panel><h2>Live boards</h2><div id=games><div class=empty>Nothing running yet — pick players and press Start.</div></div></div>
-
-<div class=cols>
-  <div>
-    <div class=panel><h2>This run</h2><div class=tbl id=runTbl><div class=empty>No finished games yet.</div></div></div>
-    <div class=panel><h2>All time (saved)</h2><div class=tbl id=allTbl><div class=empty>No saved games yet.</div></div></div>
-  </div>
-  <div class=panel><h2>High scores</h2><div class=tbl id=hi><div class=empty>No saved games yet.</div></div></div>
-</div>
+<header class="hero"><div class="hero-topline"><span>EXPERIMENT / 05</span><span>SYSTEM 1 · MODEL ARCADE</span></div>
+<h1 class="masthead"><span class="sr-only">Sudoku</span><svg aria-hidden="true" focusable="false" viewBox="0 0 470 84" preserveAspectRatio="xMinYMid meet" fill="none" stroke="currentColor" stroke-width="12" stroke-linejoin="bevel" stroke-linecap="square"><path transform="translate(0,0) scale(1,1)" d="M59 9H22L10 21V30L22 41H47L59 53V61L47 73H10"/><path transform="translate(80,0) scale(1,1)" d="M10 9V61L22 73H47L59 61V9"/><path transform="translate(160,0) scale(1,1)" d="M10 9H44L59 24V58L44 73H10Z"/><path transform="translate(240,0) scale(1,1)" d="M22 9H47L59 21V61L47 73H22L10 61V21Z"/><path transform="translate(320,0) scale(1,1)" d="M10 9V73 M59 9L25 41L59 73 M10 41H25"/><path transform="translate(400,0) scale(1,1)" d="M10 9V61L22 73H47L59 61V9"/></svg></h1>
+<div class="hero-bottom"><div class="hero-description"><span class="section-marker" aria-hidden="true">■</span><p>Find the pattern. Fill the possibility. See which digit a decision model trusts when the grid needs a choice.</p></div><div class="hero-index"><span>MULTIPLAYER ARENA<br><b>LIVE / 05</b></span><span class="index-arrow" aria-hidden="true">↗</span></div></div></header>
+<section class="panel controls" aria-label="Arena controls"><div class="eyebrow">SELECT_YOUR_PLAYERS</div>
+<div id="players" class="player-list">Loading players…</div><div class="control-row ctl"><label>Games per player<input type="number" id="n" value="3" min="1" max="20"></label>
+<div class="control-actions"><button id="start">Start arena</button><button id="stop" class="ghost" disabled>Stop</button><button id="clear" class="ghost" title="Remove board cards; saved results stay">Clear boards</button></div></div>
+<p class="help">Every board gets the same puzzle. Forced cells fill automatically. Score: 10 per correct decision, plus 100 for solving. Three mistakes end the puzzle.</p><div id="status" class="run-status" role="status" aria-live="polite"></div></section>
+<div class="live-header"><h2>Live boards</h2><span><i class="live-dot"></i>THE EXPERIMENT FLOOR</span></div>
+<div class="arena-key"><div class="board-key"><span><i class="key-given"></i>Given</span><span><i class="key-auto"></i>Auto-filled</span><span><i class="key-model"></i>Model choice</span><span><i class="key-mate"></i>Mistake</span></div></div>
+<div id="games" class="arena-grid"><div class="welcome"><div><strong>Your next comparison starts here.</strong><p>Select your players, then start a run.<br>Watch the boards unfold side by side.</p></div></div></div>
+<div class="leaderboards board-leaderboards"><section class="panel"><div class="eyebrow">CURRENT SESSION</div><h2>This run</h2><div class="tbl" id="runTbl"><div class="empty">No finished games yet.</div></div></section>
+<section class="panel"><div class="eyebrow">THE ARCHIVE</div><h2>All time</h2><div class="tbl" id="allTbl"><div class="empty">No saved games yet.</div></div></section>
+<section class="panel records-panel"><div class="eyebrow">PERSONAL BESTS</div><h2>High scores</h2><div class="tbl" id="hi"><div class="empty">No saved games yet.</div></div></section></div>
+<footer><span><span class="footer-cross" aria-hidden="true">✳</span>NINE DIGITS. A GRID OF POSSIBILITIES.</span><span><a href="/traces">Explore decision traces ↗</a> &nbsp; · &nbsp; ARCADE/LAB · EXP. 05</span></footer>
 </main>
-
+</div>
 <script>
 const $=id=>document.getElementById(id);
-const PAL=['#f67c5f','#4c8dd6','#5aa469','#c98bd3','#e0a93b','#3fb8b0','#a0785a','#d9628b'];
+const PAL=['#ff6b1a','#191919','#555553','#8c8c88','#aeaeaa','#333332','#696966','#c3c3bd'];
 let models=[],color={},games=[],running=false,stopFlag=false,saved=[];
 const label=id=>(models.find(m=>m.id==id)||{label:id}).label;
 
 async function init(){
   models=await (await fetch('/api/sudoku/models')).json();
   models.forEach((m,i)=>color[m.id]=PAL[i%PAL.length]);
-  $('players').innerHTML=models.map(m=>`<label class="${m.available?'':'off'}" title="${m.reason||''}"><input type=checkbox value="${m.id}" ${m.available&&!m.baseline?'checked':''} ${m.available?'':'disabled'}><span class=sw style="background:${color[m.id]}"></span>${m.label}${m.available?'':` <small>(${m.reason})</small>`}</label>`).join(' ');
+  $('players').innerHTML=models.map(m=>`<label class="player-chip ${m.available?'':'off'}" title="${m.reason||''}"><input type=checkbox value="${m.id}" ${m.available&&!m.baseline?'checked':''} ${m.available?'':'disabled'}><span class=sw style="background:${color[m.id]}"></span>${m.label}${m.available?'':' · unavailable'}</label>`).join(' ');
   await loadSaved();
 }
 async function loadSaved(){saved=await (await fetch('/api/sudoku/results')).json();renderAll()}
@@ -137,7 +123,8 @@ function renderAll(){
 
 $('start').onclick=start;
 $('stop').onclick=()=>{stopFlag=true};
-$('clear').onclick=()=>{if(!running){games=[];$('games').innerHTML='<div class=empty>Boards cleared.</div>';renderAll()}};
+$('clear').onclick=()=>{if(!running){games=[];$('games').innerHTML='<div class=welcome><div><strong>A clean slate.</strong><p>Choose your players and start another comparison.</p></div></div>';renderAll()}};
 init();
 </script>
+</body>
 </html>

@@ -1,47 +1,44 @@
 <!doctype html>
 <html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>2048 Single Game</title>
-<link rel=stylesheet href="/style.css">
-<style>.play{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}</style>
-<nav><div class=games><b>2048 · AI</b><a class=on href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a><a href="/flappy">Flappy</a><a href="/sudoku">Sudoku</a></div><div class=modes><a href="/2048">Arena</a><a class=on href="/2048/play">Single game</a><a href="/benchmarks">Benchmarks</a><a href="/traces">Traces</a></div></nav>
+<title>2048 · Single game · Model Arcade</title>
+<link rel="stylesheet" href="/arcade.css">
+</head>
+<body class="arcade board-page" data-game="2048" data-mode="play">
+<div class="arcade-shell">
+<nav aria-label="Arcade navigation"><div class="games"><b class="brand"><span class="brand-mark" aria-hidden="true">··</span><span>MODEL<span class="brand-sub">ARCADE/LAB</span></span></b><a class=on href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a><a href="/flappy">Flappy</a><a href="/sudoku">Sudoku</a></div>
+<div class="modes"><a href="/2048">Arena</a><a class=on href="/2048/play">Single game</a><a href="/benchmarks">Benchmarks</a><a href="/traces">Traces</a></div></nav>
 <main>
-<h1>Single game</h1>
-<p class=sub>Watch one model play move by move and see exactly what it was asked and how confident it was.</p>
-
-<div class=panel>
-  <div class=ctl>
-    <label>Player <select id=model></select></label>
-    <button id=step>Step</button><button id=auto>Auto-play</button><button id=reset class=ghost>New game</button>
-    <span id=msg class=sub style="margin:0"></span>
-  </div>
+<header class="hero"><div class="hero-topline"><span>EXPERIMENT / 01</span><span>SYSTEM 1 · MODEL ARCADE</span></div>
+<h1 class="masthead"><span class="sr-only">2048</span><svg aria-hidden="true" focusable="false" viewBox="0 0 496 84" preserveAspectRatio="xMinYMid meet" fill="none" stroke="currentColor" stroke-width="12" stroke-linejoin="bevel" stroke-linecap="square"><path transform="translate(0,0) scale(1.6,1)" d="M10 9H47L59 21V31L10 62V73H59"/><path transform="translate(128,0) scale(1.6,1)" d="M22 9H47L59 21V61L47 73H22L10 61V21Z M22 57L47 25"/><path transform="translate(256,0) scale(1.6,1)" d="M10 9V43H59 M52 9V73"/><path transform="translate(384,0) scale(1.6,1)" d="M22 9H47L59 21V30L47 41H22L10 30V21Z M22 41L10 53V61L22 73H47L59 61V53L47 41"/></svg></h1>
+<div class="hero-bottom"><div class="hero-description"><span class="section-marker" aria-hidden="true">■</span><p>Four directions. One growing ambition. Watch a decision model turn small tiles into something bigger.</p></div><div class="hero-index"><span>SINGLE GAME<br><b>LIVE / 01</b></span><span class="index-arrow" aria-hidden="true">↗</span></div></div></header>
+<section class="panel controls" aria-label="Game controls">
+<div class="control-row ctl"><label>Player<select id="model" aria-label="Player"></select></label><div class="control-actions"><button id="step">One step</button><button id="auto">Auto-play</button><button id="reset" class="ghost">New game</button></div></div>
+<p class="help">Choose a direction, merge matching tiles, and make room for the next one. Only legal moves are played.</p><div id="msg" class="run-status" role="status" aria-live="polite"></div>
+</section>
+<div class="single-layout board-layout"><div class="single-stage">
+<section class="game-card"><div class="card-top"><b>01 / THE MERGE GRID</b><span class="board-size">4 × 4</span></div><div class="board-stage"><div class="mini big" id="board" aria-label="2048 board"></div></div><div class="board-key"><span>MERGE / MATCH / REPEAT</span><span>2 → 4 → 8 → … → 2048</span></div></section>
+<div class="metrics"><div class="metric">Score<b id="score">0</b></div><div class="metric">Moves<b id="moves">0</b></div><div class="metric">Best tile<b id="best">0</b></div><div class="metric">Decision<b id="lat">—</b></div></div>
 </div>
-
-<div class=play>
-  <div class=panel>
-    <h2>Board</h2>
-    <div class="mini big" id=board></div>
-    <div class=stats><div>Score<b id=score>0</b></div><div>Moves<b id=moves>0</b></div><div>Best tile<b id=best>0</b></div><div>Latency<b id=lat>–</b></div></div>
-  </div>
-  <div>
-    <div class=panel><h2>Model's decision</h2><div id=probs class=empty>Press Step or Auto-play.</div></div>
-    <div class=panel><h2>State sent to the model</h2><pre id=state>–</pre></div>
-  </div>
+<aside class="panel decision-panel"><div class="eyebrow">INSIDE THE DECISION</div><h2>Model’s decision</h2><p class="decision-note">Compare the directions. The orange bar marks the move played.</p><div id="probs" class="probabilities"><div class="empty">Take a step to reveal the choices.</div></div>
+<details open><summary>Inspect the model’s context</summary><pre id="state">No decision yet.</pre></details></aside>
 </div>
+<footer><span><span class="footer-cross" aria-hidden="true">✳</span>SMALL TILES. BIGGER DECISIONS.</span><span><a href="/traces">Explore decision traces ↗</a> &nbsp; · &nbsp; ARCADE/LAB · EXP. 01</span></footer>
 </main>
-
+</div>
 <script>
 const $=id=>document.getElementById(id);
-const TILE={0:'#cdc1b4',2:'#eee4da',4:'#ede0c8',8:'#f2b179',16:'#f59563',32:'#f67c5f',64:'#f65e3b',128:'#edcf72',256:'#edcc61',512:'#edc850',1024:'#edc53f',2048:'#edc22e'};
+const TILE={0:'#dfdfd9',2:'#f8f8f3',4:'#c9c9c0',8:'#ffdcc4',16:'#ffae78',32:'#ff6b1a',64:'#a73a0a',128:'#33332e',256:'#242421',512:'#161614',1024:'#11110f',2048:'#080808'};
 let g,score,moves,gameId,auto=false,busy=false,over=false;
 const newId=()=>(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));
 function slide(r){const t=r.filter(x=>x),o=[];let gain=0;for(let i=0;i<t.length;i++){if(t[i]==t[i+1]){o.push(t[i]*2);gain+=t[i]*2;i++}else o.push(t[i])}while(o.length<4)o.push(0);return[o,gain]}
 function mv(gr,d){let x=gr.map(r=>r.slice());if(d=='up'||d=='down')x=x[0].map((_,c)=>x.map(r=>r[c]));if(d=='right'||d=='down')x=x.map(r=>r.reverse());let gain=0;x=x.map(r=>{const[a,b]=slide(r);gain+=b;return a});if(d=='right'||d=='down')x=x.map(r=>r.reverse());if(d=='up'||d=='down')x=x[0].map((_,c)=>x.map(r=>r[c]));return[x,gain]}
 function spawn(gr){const e=[];gr.forEach((r,i)=>r.forEach((v,j)=>{if(!v)e.push([i,j])}));if(!e.length)return;const[i,j]=e[Math.random()*e.length|0];gr[i][j]=Math.random()<.9?2:4}
-function reset(){g=[...Array(4)].map(()=>[0,0,0,0]);spawn(g);spawn(g);score=moves=0;gameId=newId();over=false;$('msg').textContent='';draw()}
+function reset(){g=[...Array(4)].map(()=>[0,0,0,0]);spawn(g);spawn(g);score=moves=0;gameId=newId();over=false;$('msg').textContent='';$('probs').innerHTML='<div class=empty>Take a step to reveal the choices.</div>';$('state').textContent='No decision yet.';$('lat').textContent='—';draw()}
 function draw(){
-  $('board').innerHTML=g.flat().map(v=>`<div style="background:${TILE[v]||'#3c3a32'};color:${v>4?'#fff':'#776e65'}">${v||''}</div>`).join('');
+  $('board').innerHTML=g.flat().map(v=>`<div style="background:${TILE[v]||'#080808'};color:${v>=64?'#fffdf6':'#242421'}">${v||''}</div>`).join('');
   $('score').textContent=score;$('moves').textContent=moves;$('best').textContent=Math.max(...g.flat());
 }
 function stop(){auto=false;$('auto').textContent='Auto-play'}
@@ -69,4 +66,5 @@ fetch('/api/2048/models').then(r=>r.json()).then(ms=>{
 });
 reset();
 </script>
+</body>
 </html>

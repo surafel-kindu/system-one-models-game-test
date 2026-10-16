@@ -251,6 +251,88 @@ body.arcade {
 .benchmark-page #detail h2 { overflow-wrap: anywhere; }
 .benchmark-page .sub { line-height: 2; }
 
+/* Board games share the arcade frame, with room for the board and its reasoning. */
+.board-page .board-layout { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr); gap: 24px; }
+.board-page .ctl select { width: 240px; }
+.board-page .run-status:empty::before { content: none; }
+.board-page .board-size { color: var(--muted); font-size: 10px; }
+.board-page .board-stage { padding: 22px; background: #ebebe6; }
+.board-page .mini { gap: 5px; padding: 5px; border: 1px solid #aaa99f; border-radius: 0; background: #c3c3bb; }
+.board-page .mini.big { max-width: 480px; margin: auto; gap: 7px; padding: 7px; }
+.board-page .mini div { border: 1px solid #00000008; border-radius: 0; font-size: clamp(20px, 3vw, 34px); font-weight: 500; letter-spacing: -1px; }
+.board-page .mini.big div { font-size: clamp(23px, 4vw, 44px); }
+.board-page .board-key { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 10px 16px; padding: 13px 18px; border-top: 1px solid var(--line); color: #66665e; font-size: 8px; line-height: 1.7; }
+.board-key span { display: inline-flex; align-items: center; gap: 6px; }
+.board-key i { display: inline-block; flex: 0 0 8px; width: 8px; height: 8px; border: 1px solid #b2b2a8; }
+.board-key .key-hint { background: #717469; border: 0; border-radius: 50%; }
+.board-key .key-capture { border: 2px solid #b84c3e; }
+.board-key .key-move, .board-key .key-model { border-color: var(--pick); background: var(--pick); }
+.board-key .key-mate { border-color: #a72f2a; background: #b94138; }
+.board-key .key-given { background: #252522; border-color: #252522; }
+.board-key .key-auto { background: #99998e; border-color: #99998e; }
+.board-page .metrics.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+.board-page .metric b { font-size: clamp(17px, 2.1vw, 25px); white-space: nowrap; letter-spacing: -1px; }
+.board-page .decision-panel { min-width: 0; }
+.board-page .probabilities { padding: 0; }
+.board-page .pr { margin-bottom: 16px; color: #68685e; font-size: 10px; line-height: 1.8; overflow-wrap: anywhere; }
+.board-page .pr:has(.pick) { color: #20201b; }
+.board-page .pr .bar { margin-top: 7px; }
+.board-page .bar.pick i { background: var(--pick); }
+.board-page .decision-panel pre { max-height: 340px; }
+.board-page .decision-note { margin-top: 0; }
+.board-page .move-panel { margin-top: 18px; }
+.board-page .move-panel .eyebrow { margin-bottom: 10px; }
+.board-page .moves { color: #68685f; font-size: 11px; line-height: 2; word-spacing: 5px; }
+.board-page .match-players { margin: 0; padding: 16px 20px; border-bottom: 1px solid var(--line); }
+.board-page .vs { gap: 12px; font-size: 11px; }
+.board-page .vs .side { gap: 9px; }
+.board-page .vs .side b { font-weight: 500; }
+.board-page .vs .side small { font-size: 8px; text-transform: uppercase; }
+.board-page .vs .side.turn small { color: #bb4207; }
+.board-page .vs .side.turn b { text-decoration: underline; text-decoration-color: var(--pick); text-underline-offset: 5px; }
+.board-page .versus { color: #838378; font-size: 8px; }
+.board-page .chessboard, .board-page .chessboard.big { max-width: none; border: 1px solid #7f8075; border-radius: 0; }
+.board-page .chessboard div { background: #f3f3ec; font-family: 'Arial Unicode MS', 'Apple Symbols', 'Segoe UI Symbol', serif; font-size: clamp(22px, 3.4vw, 42px); line-height: 1; }
+.board-page .chessboard.big div { font-size: clamp(24px, 4.2vw, 52px); }
+.board-page .chessboard div.dark { background: #aaa99c; }
+.board-page .chessboard div.white-piece { color: #fffffa; text-shadow: -1px 0 #34362e, 0 1px #34362e, 1px 0 #34362e, 0 -1px #34362e; }
+.board-page .chessboard div.black-piece { color: #22231f; text-shadow: 0 1px 0 #ffffff50; }
+.board-page .chessboard div.hint::after { background: #4d554a70; }
+.board-page .chessboard div.hint.capture-hint::after { background: transparent; box-shadow: inset 0 0 0 3px #b84c3eaa; }
+.board-page .chessboard div.from-sq { box-shadow: inset 0 0 0 3px #d3672a9c; background: #d9c3aa; }
+.board-page .chessboard div.to-sq { box-shadow: inset 0 0 0 3px var(--pick); background: #ffc29b; }
+.board-page .chessboard.mate { outline-color: #b94138; }
+.board-page .chessboard div.mate-sq { background: #b94138 !important; }
+.chess-coordinates { display: grid; grid-template-columns: 14px minmax(0, 1fr); gap: 8px; }
+.rank-labels { display: grid; grid-template-rows: repeat(8, 1fr); color: #77776c; font-size: 9px; }
+.rank-labels span { display: grid; place-items: center; }
+.file-labels { display: grid; grid-template-columns: repeat(8, 1fr); grid-column: 2; color: #77776c; font-size: 9px; text-align: center; }
+.board-page .sudoku, .board-page .sudoku.big { max-width: 480px; margin: auto; border: 2px solid #393a33; border-radius: 0; background: #fafaf5; }
+.board-page .sudoku .cell { border-color: #d2d2c8; color: #34352d; font-size: clamp(13px, 2vw, 23px); }
+.board-page .sudoku.big .cell { font-size: clamp(17px, 2.6vw, 28px); }
+.board-page .sudoku .cell.r { border-right-color: #393a33; }
+.board-page .sudoku .cell.b { border-bottom-color: #393a33; }
+.board-page .sudoku .cell.given { background: #eeeee7; color: #22231d; font-weight: 700; }
+.board-page .sudoku .cell.auto { color: #7d7e72; }
+.board-page .sudoku .cell.model { color: #bf4307; font-weight: 600; }
+.board-page .sudoku .cell.asked { background: #ffddc7; box-shadow: inset 0 0 0 2px var(--pick); }
+.board-page .sudoku .cell.wrong { background: #f4c4bd; box-shadow: inset 0 0 0 2px #b94138; }
+.board-page .arena-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr)); }
+.board-page[data-game=chess] .arena-grid { grid-template-columns: repeat(auto-fill, minmax(min(100%, 380px), 1fr)); }
+.board-page .arena-grid > .empty { grid-column: 1/-1; }
+.board-page .arena-key { margin: 0 30px; }
+.board-page .arena-key .board-key { justify-content: flex-start; border-top: 0; padding: 18px 0 0; }
+.board-page .g { min-width: 0; align-self: start; overflow: hidden; border: 1px solid #b5b5ae; background: #f7f7f2; }
+.board-page .g .h { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 16px 18px; border-bottom: 1px solid var(--line); font-size: 11px; }
+.board-page .g .h b { font-weight: 500; }
+.board-page .g .sc { font-size: 24px; letter-spacing: -1px; }
+.board-page .g .mini, .board-page .g .sudoku, .board-page .g .bd { margin: 18px; width: calc(100% - 36px); }
+.board-page .g .bd .chessboard { width: 100%; }
+.board-page .g .vs { margin: 0; padding: 16px 18px; border-bottom: 1px solid var(--line); }
+.board-page .g .f { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 5px; padding: 12px 18px; border-top: 1px solid var(--line); color: #737368; font-size: 9px; line-height: 1.8; }
+.board-page .g.done .f { background: #ecece5; color: #3e3f35; }
+.board-page .records-panel { grid-column: 1/-1; }
+
 @media (min-width: 1600px) { body.arcade { padding-top: 76px; padding-bottom: 76px; } }
 @media (max-width: 1100px) {
   .arcade nav { padding: 0 16px; }
@@ -276,6 +358,10 @@ body.arcade {
   .live-header { padding: 20px; }
   .benchmark-page .runs { grid-template-columns: minmax(0, 1fr); margin: 20px; }
   .arcade footer { padding: 20px; }
+  .board-page .board-layout { grid-template-columns: minmax(0, 1fr); gap: 18px; }
+  .board-page .board-stage { padding: 18px; }
+  .board-page .arena-key { margin: 0 20px; }
+  .board-page .metric b { font-size: 21px; }
 }
 @media (max-width: 480px) {
   body.arcade { padding: 12px 8px; }
@@ -308,4 +394,14 @@ body.arcade {
   .arcade .leaderboards { margin: 18px 13px; }
   .arcade footer { padding: 18px 14px; font-size: 7px; }
   .benchmark-page .runs { margin: 18px 13px; }
+  .board-page .board-stage { padding: 12px; }
+  .board-page .board-key { padding: 12px; gap: 8px 12px; font-size: 7px; }
+  .board-page .match-players { padding: 13px; }
+  .board-page .vs { font-size: 10px; }
+  .board-page .vs .side { gap: 5px; }
+  .board-page .arena-key { margin: 0 13px; }
+  .board-page .metric b { font-size: clamp(13px, 4vw, 17px); letter-spacing: -.7px; white-space: normal; overflow-wrap: anywhere; }
+  .board-page .mini.big { gap: 4px; padding: 4px; }
+  .board-page .g .mini, .board-page .g .sudoku, .board-page .g .bd { margin: 12px; width: calc(100% - 24px); }
+  .board-page .ctl label:has(#white), .board-page .ctl label:has(#black) { flex: 1; min-width: 0; }
 }

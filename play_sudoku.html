@@ -1,38 +1,33 @@
 <!doctype html>
 <html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Sudoku — Single Game</title>
-<link rel=stylesheet href="/style.css">
-<style>.play{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}</style>
-<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a><a href="/flappy">Flappy</a><a class=on href="/sudoku">Sudoku</a></div>
-<div class=modes><a href="/sudoku">Arena</a><a class=on href="/sudoku/play">Single game</a><a href="/benchmarks">Benchmarks</a><a href="/traces">Traces</a></div></nav>
+<title>Sudoku · Single game · Model Arcade</title>
+<link rel="stylesheet" href="/arcade.css">
+</head>
+<body class="arcade board-page" data-game="sudoku" data-mode="play">
+<div class="arcade-shell">
+<nav aria-label="Arcade navigation"><div class="games"><b class="brand"><span class="brand-mark" aria-hidden="true">··</span><span>MODEL<span class="brand-sub">ARCADE/LAB</span></span></b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a><a href="/flappy">Flappy</a><a class=on href="/sudoku">Sudoku</a></div>
+<div class="modes"><a href="/sudoku">Arena</a><a class=on href="/sudoku/play">Single game</a><a href="/benchmarks">Benchmarks</a><a href="/traces">Traces</a></div></nav>
 <main>
-<h1>Sudoku — single game</h1>
-<p class=sub>Each step the engine fills any cell with exactly one legal digit, then asks the model about the next cell that needs a real decision. A wrong digit is a mistake (it isn't placed); three mistakes end the game.</p>
-<p class=legend>Bold = given · <span style="color:var(--accent)"><b>tan</b></span> = placed by the model · <span style="color:var(--muted)">grey</span> = filled automatically (only one legal digit) · highlighted = the cell just asked about (red if the model got it wrong).</p>
-
-<div class=panel>
-  <div class=ctl>
-    <label>Player <select id=model></select></label>
-    <button id=step>Step</button><button id=auto>Auto-play</button><button id=reset class=ghost>New puzzle</button>
-    <span id=msg class=sub style="margin:0"></span>
-  </div>
+<header class="hero"><div class="hero-topline"><span>EXPERIMENT / 05</span><span>SYSTEM 1 · MODEL ARCADE</span></div>
+<h1 class="masthead"><span class="sr-only">Sudoku</span><svg aria-hidden="true" focusable="false" viewBox="0 0 470 84" preserveAspectRatio="xMinYMid meet" fill="none" stroke="currentColor" stroke-width="12" stroke-linejoin="bevel" stroke-linecap="square"><path transform="translate(0,0) scale(1,1)" d="M59 9H22L10 21V30L22 41H47L59 53V61L47 73H10"/><path transform="translate(80,0) scale(1,1)" d="M10 9V61L22 73H47L59 61V9"/><path transform="translate(160,0) scale(1,1)" d="M10 9H44L59 24V58L44 73H10Z"/><path transform="translate(240,0) scale(1,1)" d="M22 9H47L59 21V61L47 73H22L10 61V21Z"/><path transform="translate(320,0) scale(1,1)" d="M10 9V73 M59 9L25 41L59 73 M10 41H25"/><path transform="translate(400,0) scale(1,1)" d="M10 9V61L22 73H47L59 61V9"/></svg></h1>
+<div class="hero-bottom"><div class="hero-description"><span class="section-marker" aria-hidden="true">■</span><p>Find the pattern. Fill the possibility. See which digit a decision model trusts when the grid needs a choice.</p></div><div class="hero-index"><span>SINGLE GAME<br><b>LIVE / 05</b></span><span class="index-arrow" aria-hidden="true">↗</span></div></div></header>
+<section class="panel controls" aria-label="Game controls">
+<div class="control-row ctl"><label>Player<select id="model" aria-label="Player"></select></label><div class="control-actions"><button id="step">One step</button><button id="auto">Auto-play</button><button id="reset" class="ghost">New puzzle</button></div></div>
+<p class="help">Forced cells fill automatically. The model chooses a digit for the next undecided cell. Three mistakes end the puzzle.</p><div id="msg" class="run-status" role="status" aria-live="polite"></div>
+</section>
+<div class="single-layout board-layout"><div class="single-stage">
+<section class="game-card"><div class="card-top"><b>05 / THE NUMBER GRID</b><span class="board-size">9 × 9</span></div><div class="board-stage"><div class="sudoku big" id="board" aria-label="Sudoku board"></div></div><div class="board-key"><span><i class="key-given"></i>Given</span><span><i class="key-auto"></i>Auto-filled</span><span><i class="key-model"></i>Model choice</span><span><i class="key-mate"></i>Mistake</span></div></section>
+<div class="metrics"><div class="metric">Score<b id="score">0</b></div><div class="metric">Mistakes<b id="mistakes">0/3</b></div><div class="metric">Placed<b id="placed">0</b></div><div class="metric">Decision<b id="lat">—</b></div></div>
 </div>
-
-<div class=play>
-  <div class=panel>
-    <h2>Board</h2>
-    <div class="sudoku big" id=board></div>
-    <div class=stats><div>Score<b id=score>0</b></div><div>Mistakes<b id=mistakes>0/3</b></div><div>Placed<b id=placed>0</b></div><div>Latency<b id=lat>–</b></div></div>
-  </div>
-  <div>
-    <div class=panel><h2>Model's decision</h2><div id=probs class=empty>Press Step or Auto-play.</div></div>
-    <div class=panel><h2>State sent to the model</h2><pre id=state>–</pre></div>
-  </div>
+<aside class="panel decision-panel"><div class="eyebrow">INSIDE THE DECISION</div><h2>Model’s decision</h2><p class="decision-note">Compare the candidate digits. The orange bar marks the model’s choice.</p><div id="probs" class="probabilities"><div class="empty">Take a step to reveal the choices.</div></div>
+<details open><summary>Inspect the model’s context</summary><pre id="state">No decision yet.</pre></details></aside>
 </div>
+<footer><span><span class="footer-cross" aria-hidden="true">✳</span>NINE DIGITS. A GRID OF POSSIBILITIES.</span><span><a href="/traces">Explore decision traces ↗</a> &nbsp; · &nbsp; ARCADE/LAB · EXP. 05</span></footer>
 </main>
-
+</div>
 <script>
 const $=id=>document.getElementById(id);
 let gameId=null,grid=null,kind=null,auto=false,busy=false,over=false,asked=null,wrong=null;
@@ -52,7 +47,7 @@ function stats(s){
 }
 function stop(){auto=false;$('auto').textContent='Auto-play'}
 async function reset(){
-  stop();over=false;asked=wrong=null;$('msg').textContent='';$('probs').innerHTML='<div class=empty>Press Step or Auto-play.</div>';$('state').textContent='–';
+  stop();over=false;asked=wrong=null;$('msg').textContent='';$('probs').innerHTML='<div class=empty>Take a step to reveal the choices.</div>';$('state').textContent='–';
   const r=await (await fetch('/api/sudoku/games',{method:'POST',body:JSON.stringify({model:$('model').value,seed:Math.floor(Math.random()*1e9)})})).json();
   if(r.error){$('msg').innerHTML=`<span class=err>${r.error}</span>`;return}
   gameId=r.game_id;grid=r.grid;kind=r.given.map(row=>row.map(g=>g?'given':''));
@@ -88,4 +83,5 @@ fetch('/api/sudoku/models').then(r=>r.json()).then(async ms=>{
   await reset();
 });
 </script>
+</body>
 </html>

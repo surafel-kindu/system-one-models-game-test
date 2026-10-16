@@ -1,53 +1,33 @@
 <!doctype html>
 <html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Chess — Match</title>
-<link rel=stylesheet href="/style.css">
-<style>.play{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}</style>
-<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a class=on href="/chess">Chess</a><a href="/flappy">Flappy</a><a href="/sudoku">Sudoku</a></div>
-<div class=modes><a href="/chess">Arena</a><a class=on href="/chess/play">Match</a><a href="/benchmarks">Benchmarks</a><a href="/traces">Traces</a></div></nav>
+<title>Chess · Match · Model Arcade</title>
+<link rel="stylesheet" href="/arcade.css">
+</head>
+<body class="arcade board-page" data-game="chess" data-mode="play">
+<div class="arcade-shell">
+<nav aria-label="Arcade navigation"><div class="games"><b class="brand"><span class="brand-mark" aria-hidden="true">··</span><span>MODEL<span class="brand-sub">ARCADE/LAB</span></span></b><a href="/2048">2048</a><a href="/dino">Dino Run</a><a class=on href="/chess">Chess</a><a href="/flappy">Flappy</a><a href="/sudoku">Sudoku</a></div>
+<div class="modes"><a href="/chess">Arena</a><a class=on href="/chess/play">Match</a><a href="/benchmarks">Benchmarks</a><a href="/traces">Traces</a></div></nav>
 <main>
-<h1>Chess — one match, two models</h1>
-<p class=sub>Pick who plays White and who plays Black, then watch them play each other move by move.</p>
-<p class=legend>Each side sees the full board, whose pieces are its own, and which way it moves, and
-picks from the top ~14 legal moves ranked by capture value, checks and center control (not every
-legal move — see the README). Castling, en passant, promotion and checkmate all apply.</p>
-
-<div class=panel>
-  <div class=ctl>
-    <label>White <select id=white></select></label>
-    <label>Black <select id=black></select></label>
-    <button id=step>Step</button><button id=auto>Auto-play</button><button id=reset class=ghost>New match</button>
-    <span id=msg class=sub style="margin:0"></span>
-  </div>
+<header class="hero"><div class="hero-topline"><span>EXPERIMENT / 03</span><span>SYSTEM 1 · MODEL ARCADE</span></div>
+<h1 class="masthead"><span class="sr-only">Chess</span><svg aria-hidden="true" focusable="false" viewBox="0 0 470 84" preserveAspectRatio="xMinYMid meet" fill="none" stroke="currentColor" stroke-width="12" stroke-linejoin="bevel" stroke-linecap="square"><path transform="translate(0,0) scale(1,1)" d="M59 9H22L10 21V61L22 73H59"/><path transform="translate(80,0) scale(1,1)" d="M10 9V73 M59 9V73 M10 41H59"/><path transform="translate(160,0) scale(1,1)" d="M59 9H10V73H59 M10 41H49"/><path transform="translate(240,0) scale(1,1)" d="M59 9H22L10 21V30L22 41H47L59 53V61L47 73H10"/><path transform="translate(320,0) scale(1,1)" d="M59 9H22L10 21V30L22 41H47L59 53V61L47 73H10"/><path transform="translate(400,0) scale(1,1)" d="M8 73H60"/></svg></h1>
+<div class="hero-bottom"><div class="hero-description"><span class="section-marker" aria-hidden="true">■</span><p>An opening. A response. A new possibility. Put two decision models across the board and follow every move.</p></div><div class="hero-index"><span>HEAD TO HEAD<br><b>LIVE / 03</b></span><span class="index-arrow" aria-hidden="true">↗</span></div></div></header>
+<section class="panel controls" aria-label="Game controls">
+<div class="control-row ctl"><label>White<select id="white" aria-label="White player"></select></label><label>Black<select id="black" aria-label="Black player"></select></label><div class="control-actions"><button id="step">One step</button><button id="auto">Auto-play</button><button id="reset" class="ghost">New match</button></div></div>
+<p class="help">Each side sees the full board and chooses from the top ~14 ranked legal moves. Castling, en passant, promotion, and checkmate apply.</p><div id="msg" class="run-status" role="status" aria-live="polite"></div>
+</section>
+<div class="single-layout board-layout"><div class="single-stage">
+<section class="game-card"><div class="card-top"><b>03 / THE MATCH BOARD</b><span class="board-size">8 × 8</span></div><div class="vs match-players"><span class="side w" id="wside"><small>White</small><b id="wname">White</b></span><span class="versus">VS</span><span class="side b" id="bside"><b id="bname">Black</b><small>Black</small></span></div><div class="board-stage"><div class="chess-coordinates"><div class="rank-labels" aria-hidden="true"><span>8</span><span>7</span><span>6</span><span>5</span><span>4</span><span>3</span><span>2</span><span>1</span></div><div class="chessboard big" id="board" aria-label="Chess board"></div><div class="file-labels" aria-hidden="true"><span>a</span><span>b</span><span>c</span><span>d</span><span>e</span><span>f</span><span>g</span><span>h</span></div></div></div><div class="board-key"><span><i class="key-hint"></i>Considering</span><span><i class="key-capture"></i>Capture option</span><span><i class="key-move"></i>Last move</span><span><i class="key-mate"></i>Checkmate</span></div></section>
+<div class="metrics three"><div class="metric">Ply<b id="ply">0</b></div><div class="metric">To move<b id="turn">White</b></div><div class="metric">Decision<b id="lat">—</b></div></div><section class="panel move-panel"><div class="eyebrow">THE GAME SO FAR</div><h2>Move history</h2><div class="moves" id="history">–</div></section>
 </div>
-
-<div class=play>
-  <div class=panel>
-    <h2>Board</h2>
-    <div class=vs style="margin-bottom:10px">
-      <span class="side w" id=wside><small>White</small><span class=sw style="background:#eee"></span><b id=wname>White</b></span>
-      <span class=sub>vs</span>
-      <span class="side b" id=bside><b id=bname>Black</b><span class=sw style="background:#333"></span><small>Black</small></span>
-    </div>
-    <div class="chessboard big" id=board></div>
-    <div class=legend-row>
-      <span class=chip><i style="background:rgba(80,160,90,.55);border-radius:50%"></i> considering</span>
-      <span class=chip><i style="background:transparent;box-shadow:inset 0 0 0 2px rgba(217,83,79,.65)"></i> considering a capture</span>
-      <span class=chip><i style="background:var(--pick)"></i> move just played</span>
-      <span class=chip><i style="background:#d9534f"></i> checkmate</span>
-    </div>
-    <div class=stats><div>Ply<b id=ply>0</b></div><div>Turn<b id=turn>White</b></div><div>Latency<b id=lat>–</b></div></div>
-  </div>
-  <div>
-    <div class=panel><h2>Mover's decision</h2><div id=probs class=empty>Press Step or Auto-play.</div></div>
-    <div class=panel><h2>State sent to the mover</h2><pre id=state>–</pre></div>
-    <div class=panel><h2>Moves</h2><div class=moves id=history>–</div></div>
-  </div>
+<aside class="panel decision-panel"><div class="eyebrow">INSIDE THE DECISION</div><h2>Mover’s decision</h2><p class="decision-note">Compare the mover’s candidate moves. The orange bar marks the move played.</p><div id="probs" class="probabilities"><div class="empty">Take a step to reveal the choices.</div></div>
+<details open><summary>Inspect the model’s context</summary><pre id="state">No decision yet.</pre></details></aside>
 </div>
+<footer><span><span class="footer-cross" aria-hidden="true">✳</span>TWO PLAYERS. EVERY MOVE COUNTS.</span><span><a href="/traces">Explore decision traces ↗</a> &nbsp; · &nbsp; ARCADE/LAB · EXP. 03</span></footer>
 </main>
-
+</div>
 <script>
 const $=id=>document.getElementById(id);
 const GLYPH={p:'♟',n:'♞',b:'♝',r:'♜',q:'♛',k:'♚',P:'♙',N:'♘',B:'♗',R:'♖',Q:'♕',K:'♔'};
@@ -93,7 +73,7 @@ function drawTurn(turn){
 }
 
 async function reset(){
-  stop();over=false;history=[];$('msg').textContent='';$('probs').innerHTML='<div class=empty>Press Step or Auto-play.</div>';$('state').textContent='–';
+  stop();over=false;history=[];$('msg').textContent='';$('probs').innerHTML='<div class=empty>Take a step to reveal the choices.</div>';$('state').textContent='–';
   $('board').classList.remove('mate');
   $('wname').textContent=label($('white').value);$('bname').textContent=label($('black').value);
   const r=await (await fetch('/api/chess/matches',{method:'POST',body:JSON.stringify({white:$('white').value,black:$('black').value})})).json();
@@ -138,4 +118,5 @@ fetch('/api/chess/models').then(r=>r.json()).then(async ms=>{
   await reset();
 });
 </script>
+</body>
 </html>

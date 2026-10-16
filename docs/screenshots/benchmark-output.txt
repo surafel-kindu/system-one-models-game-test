@@ -1,0 +1,49 @@
+MODEL ARCADE / BENCHMARK
+
+  Run 20261016-140718-dcc9 · average · assisted control
+
+  Games: dino, flappy · 1 seeds from 42
+
+  First use of a local model may take time to load its weights. Ctrl+C stops safely.
+
+== dino · average · 1 seeded games × 3 players ==
+
+  ✓ jev       seed 42    score   1000  · 84.3s elapsed
+
+  ✓ greedy    seed 42    score   1000  · 0.0s elapsed
+
+  ✓ oracle    seed 42    score   1000  · 0.1s elapsed
+
+#  player         score    mean  std  median  worst  best
+-  ------  ------------  ------  ---  ------  -----  ----
+1     jev  ████████████  1000.0  0.0    1000   1000  1000
+2  greedy  ████████████  1000.0  0.0    1000   1000  1000
+3  oracle  ████████████  1000.0  0.0    1000   1000  1000
+
+== flappy · average · 1 seeded games × 3 players ==
+
+  ✓ jev       seed 42    score   1000  · 80.8s elapsed
+
+  ✓ greedy    seed 42    score     20  · 0.0s elapsed
+
+  ✓ oracle    seed 42    score   1000  · 0.0s elapsed
+
+#  player         score    mean  std  median  worst  best
+-  ------  ------------  ------  ---  ------  -----  ----
+1     jev  ████████████  1000.0  0.0    1000   1000  1000
+2  oracle  ████████████  1000.0  0.0    1000   1000  1000
+3  greedy                  20.0  0.0      20     20    20
+
+OVERALL LEADERBOARD · mean of per-game 0–100 points
+
+#  player  overall  dino  flappy
+-  ------  -------  ----  ------
+1     jev    100.0   100     100
+2  oracle    100.0   100     100
+3  greedy     51.0   100       2
+
+  Missing games are excluded from a player's mean; baselines use their own policies.
+
+  Finished in 165.2s · 2/2 games ranked
+
+Results: http://localhost:8048/benchmarks · run 20261016-140718-dcc9

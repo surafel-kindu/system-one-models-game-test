@@ -1,48 +1,36 @@
 <!doctype html>
 <html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>2048 Arena</title>
-<link rel=stylesheet href="/style.css">
-<style>
-#games{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
-.g{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:8px}
-.g.done{opacity:.75}
-.g .h{display:flex;justify-content:space-between;font-size:12px;margin-bottom:6px}
-.g .f{font-size:11px;color:var(--muted);margin-top:5px;display:flex;justify-content:space-between}
-</style>
-<nav><div class=games><b>2048 · AI</b><a class=on href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a><a href="/flappy">Flappy</a><a href="/sudoku">Sudoku</a></div><div class=modes><a class=on href="/2048">Arena</a><a href="/2048/play">Single game</a><a href="/benchmarks">Benchmarks</a><a href="/traces">Traces</a></div></nav>
+<title>2048 · Arena · Model Arcade</title>
+<link rel="stylesheet" href="/arcade.css">
+</head>
+<body class="arcade board-page" data-game="2048" data-mode="arena">
+<div class="arcade-shell">
+<nav aria-label="Arcade navigation"><div class="games"><b class="brand"><span class="brand-mark" aria-hidden="true">··</span><span>MODEL<span class="brand-sub">ARCADE/LAB</span></span></b><a class=on href="/2048">2048</a><a href="/dino">Dino Run</a><a href="/chess">Chess</a><a href="/flappy">Flappy</a><a href="/sudoku">Sudoku</a></div>
+<div class="modes"><a class=on href="/2048">Arena</a><a href="/2048/play">Single game</a><a href="/benchmarks">Benchmarks</a><a href="/traces">Traces</a></div></nav>
 <main>
-<h1>Arena</h1>
-<p class=sub>Run many games at once, compare players, and keep high scores.</p>
-<p class=legend>Every board in a run starts from the same two tiles (same position, same values),
-so a lucky or unlucky start doesn't favor one player over another.</p>
+<header class="hero"><div class="hero-topline"><span>EXPERIMENT / 01</span><span>SYSTEM 1 · MODEL ARCADE</span></div>
+<h1 class="masthead"><span class="sr-only">2048</span><svg aria-hidden="true" focusable="false" viewBox="0 0 496 84" preserveAspectRatio="xMinYMid meet" fill="none" stroke="currentColor" stroke-width="12" stroke-linejoin="bevel" stroke-linecap="square"><path transform="translate(0,0) scale(1.6,1)" d="M10 9H47L59 21V31L10 62V73H59"/><path transform="translate(128,0) scale(1.6,1)" d="M22 9H47L59 21V61L47 73H22L10 61V21Z M22 57L47 25"/><path transform="translate(256,0) scale(1.6,1)" d="M10 9V43H59 M52 9V73"/><path transform="translate(384,0) scale(1.6,1)" d="M22 9H47L59 21V30L47 41H22L10 30V21Z M22 41L10 53V61L22 73H47L59 61V53L47 41"/></svg></h1>
+<div class="hero-bottom"><div class="hero-description"><span class="section-marker" aria-hidden="true">■</span><p>Four directions. One growing ambition. Watch a decision model turn small tiles into something bigger.</p></div><div class="hero-index"><span>MULTIPLAYER ARENA<br><b>LIVE / 01</b></span><span class="index-arrow" aria-hidden="true">↗</span></div></div></header>
+<section class="panel controls" aria-label="Arena controls"><div class="eyebrow">SELECT_YOUR_PLAYERS</div>
+<div id="players" class="player-list">Loading players…</div><div class="control-row ctl"><label>Games per player<input type="number" id="n" value="3" min="1" max="20"></label>
+<div class="control-actions"><button id="start">Start arena</button><button id="stop" class="ghost" disabled>Stop</button><button id="clear" class="ghost" title="Remove board cards; saved results stay">Clear boards</button></div></div>
+<p class="help">Every board starts from the same two tiles. Later tiles spawn independently. Completed games are saved to the leaderboard.</p><div id="status" class="run-status" role="status" aria-live="polite"></div></section>
+<div class="live-header"><h2>Live boards</h2><span><i class="live-dot"></i>THE EXPERIMENT FLOOR</span></div>
 
-<div class=panel>
-  <div class=ctl>
-    <span id=players>Loading players…</span>
-    <label>Games per player <input type=number id=n value=3 min=1 max=20></label>
-    <button id=start>Start</button><button id=stop class=ghost disabled>Stop</button>
-    <button id=clear class=ghost title="Remove board cards from the page (saved results stay)">Clear boards</button>
-    <span id=status class=sub style="margin:0"></span>
-  </div>
-</div>
-
-<div class=panel><h2>Live boards</h2><div id=games><div class=empty>Nothing running yet — pick players and press Start.</div></div></div>
-
-<div class=cols>
-  <div>
-    <div class=panel><h2>This run</h2><div class=tbl id=runTbl><div class=empty>No finished games yet.</div></div></div>
-    <div class=panel><h2>All time (saved)</h2><div class=tbl id=allTbl><div class=empty>No saved games yet.</div></div></div>
-  </div>
-  <div class=panel><h2>High scores</h2><div class=tbl id=hi><div class=empty>No saved games yet.</div></div></div>
-</div>
+<div id="games" class="arena-grid"><div class="welcome"><div><strong>Your next comparison starts here.</strong><p>Select your players, then start a run.<br>Watch the boards unfold side by side.</p></div></div></div>
+<div class="leaderboards board-leaderboards"><section class="panel"><div class="eyebrow">CURRENT SESSION</div><h2>This run</h2><div class="tbl" id="runTbl"><div class="empty">No finished games yet.</div></div></section>
+<section class="panel"><div class="eyebrow">THE ARCHIVE</div><h2>All time</h2><div class="tbl" id="allTbl"><div class="empty">No saved games yet.</div></div></section>
+<section class="panel records-panel"><div class="eyebrow">PERSONAL BESTS</div><h2>High scores</h2><div class="tbl" id="hi"><div class="empty">No saved games yet.</div></div></section></div>
+<footer><span><span class="footer-cross" aria-hidden="true">✳</span>SMALL TILES. BIGGER DECISIONS.</span><span><a href="/traces">Explore decision traces ↗</a> &nbsp; · &nbsp; ARCADE/LAB · EXP. 01</span></footer>
 </main>
-
+</div>
 <script>
 const $=id=>document.getElementById(id);
-const TILE={0:'#cdc1b4',2:'#eee4da',4:'#ede0c8',8:'#f2b179',16:'#f59563',32:'#f67c5f',64:'#f65e3b',128:'#edcf72',256:'#edcc61',512:'#edc850',1024:'#edc53f',2048:'#edc22e'};
-const PAL=['#f67c5f','#4c8dd6','#5aa469','#c98bd3','#e0a93b','#3fb8b0','#a0785a','#d9628b'];
+const TILE={0:'#dfdfd9',2:'#f8f8f3',4:'#c9c9c0',8:'#ffdcc4',16:'#ffae78',32:'#ff6b1a',64:'#a73a0a',128:'#33332e',256:'#242421',512:'#161614',1024:'#11110f',2048:'#080808'};
+const PAL=['#ff6b1a','#191919','#555553','#8c8c88','#aeaeaa','#333332','#696966','#c3c3bd'];
 const MOVE_CAP=3000;
 let models=[],color={},games=[],running=false,stopFlag=false,saved=[];
 
@@ -57,7 +45,7 @@ const label=id=>(models.find(m=>m.id==id)||{label:id}).label;
 async function init(){
   models=await (await fetch('/api/2048/models')).json();
   models.forEach((m,i)=>color[m.id]=PAL[i%PAL.length]);
-  $('players').innerHTML=models.map(m=>`<label class="${m.available?'':'off'}" title="${m.reason||''}"><input type=checkbox value="${m.id}" ${m.available&&!m.baseline?'checked':''} ${m.available?'':'disabled'}><span class=sw style="background:${color[m.id]}"></span>${m.label}${m.available?'':` <small>(${m.reason})</small>`}</label>`).join(' ');
+  $('players').innerHTML=models.map(m=>`<label class="player-chip ${m.available?'':'off'}" title="${m.reason||''}"><input type=checkbox value="${m.id}" ${m.available&&!m.baseline?'checked':''} ${m.available?'':'disabled'}><span class=sw style="background:${color[m.id]}"></span>${m.label}${m.available?'':' · unavailable'}</label>`).join(' ');
   await loadSaved();
 }
 async function loadSaved(){saved=await (await fetch('/api/2048/results')).json();renderAll()}
@@ -71,7 +59,7 @@ function mkGame(model,startGrid){
   return {model,gameId:newId(),grid:startGrid.map(r=>r.slice()),score:0,moves:0,ms:0,illegal:0,over:false,saved:false,el};
 }
 function drawGame(g){
-  g.el.querySelector('.mini').innerHTML=g.grid.flat().map(v=>`<div style="background:${TILE[v]||'#3c3a32'};color:${v>4?'#fff':'#776e65'}">${v||''}</div>`).join('');
+  g.el.querySelector('.mini').innerHTML=g.grid.flat().map(v=>`<div style="background:${TILE[v]||'#080808'};color:${v>=64?'#fffdf6':'#242421'}">${v||''}</div>`).join('');
   g.el.querySelector('.sc').textContent=g.score;g.el.querySelector('.mv').textContent=g.moves+' moves';
 }
 async function play(g){
@@ -136,7 +124,8 @@ function renderAll(){
 
 $('start').onclick=start;
 $('stop').onclick=()=>{stopFlag=true};
-$('clear').onclick=()=>{if(!running){games=[];$('games').innerHTML='<div class=empty>Boards cleared.</div>';renderAll()}};
+$('clear').onclick=()=>{if(!running){games=[];$('games').innerHTML='<div class=welcome><div><strong>A clean slate.</strong><p>Choose your players and start another comparison.</p></div></div>';renderAll()}};
 init();
 </script>
+</body>
 </html>
