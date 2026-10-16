@@ -138,7 +138,7 @@ cd website
 docker compose up --build -d
 ```
 
-Open <http://localhost:8080/benchmarks>. New result files appear on refresh without rebuilding. To copy an existing log, run `python3 tools/import_benchmarks.py ../bench_runs.jsonl` from `website/`. The hosted explorer labels legacy records and keeps control modes, versions, formats, and game coverage visible.
+Open <https://arcade.afroawi.com/benchmarks> after configuring host Nginx to proxy to `127.0.0.1:28481` and terminate HTTPS. The default Compose settings match this deployment; direct local HTTP overrides are documented in the website README. New result files appear on refresh without rebuilding. To copy an existing log, run `python3 tools/import_benchmarks.py ../bench_runs.jsonl` from `website/`. The hosted explorer labels legacy records and keeps control modes, versions, formats, and game coverage visible.
 
 The older commands (`bench.py`, `bench_dino.py`, `bench_flappy.py`, `bench_sudoku.py`,
 `bench_chess.py`) keep their positional arguments and now delegate to this runner for progress,

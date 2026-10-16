@@ -146,7 +146,7 @@ cd website
 docker compose up --build -d
 ```
 
-Open <http://localhost:8080>. It reads benchmark folders, explains the project, accepts model/game suggestions into a persistent private review queue, and includes contribution and PR guides. Optional domain/HTTPS hosting is documented in that folder. It runs independently of the model/game environment below. See [CONTRIBUTING.md](CONTRIBUTING.md) to add a model or a game with or without a browser UI.
+The website defaults to <https://arcade.afroawi.com> behind host Nginx, with the app bound to `127.0.0.1:28481`. It reads benchmark folders, explains the project, accepts model/game suggestions into a persistent private review queue, and includes contribution and PR guides. Nginx/HTTPS setup and local HTTP overrides are documented in that folder. It runs independently of the model/game environment below. See [CONTRIBUTING.md](CONTRIBUTING.md) to add a model or a game with or without a browser UI.
 
 Requires Python 3.10+. The server starts immediately; each local model loads on its first decision.
 The first use of an uncached model downloads its checkpoint (which can take a few minutes).

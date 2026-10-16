@@ -4,13 +4,13 @@ services:
     build: .
     restart: unless-stopped
     ports:
-      - "${HOST_BIND:-127.0.0.1}:${PORT:-8080}:8000"
+      - "${HOST_BIND:-127.0.0.1}:${PORT:-28481}:8000"
     environment:
       BENCHMARK_DIR: /benchmarks
       DATA_DIR: /data
       REPOSITORY_URL: ${REPOSITORY_URL:-https://github.com/surafel-kindu/system-one-models-game-test}
-      PUBLIC_URL: ${PUBLIC_URL:-}
-      TRUST_PROXY: ${TRUST_PROXY:-0}
+      PUBLIC_URL: ${PUBLIC_URL:-https://arcade.afroawi.com}
+      TRUST_PROXY: ${TRUST_PROXY:-1}
       SUBMISSIONS_PER_HOUR: ${SUBMISSIONS_PER_HOUR:-5}
     volumes:
       - type: bind

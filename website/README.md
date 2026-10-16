@@ -42,9 +42,19 @@ cd website
 docker compose up --build -d
 ```
 
-Open [http://localhost:8080](http://localhost:8080). Docker Compose is the only local dependency. The image installs the website's small, separate requirements and serves Flask through Gunicorn as a non-root user.
+The defaults target [https://arcade.afroawi.com](https://arcade.afroawi.com) behind the server's existing Nginx. Compose publishes **127.0.0.1:28481** to the container's internal port 8000, sets `PUBLIC_URL=https://arcade.afroawi.com`, and trusts one proxy. No `.env` is required for this deployment. Nginx must proxy that hostname to `http://127.0.0.1:28481` and terminate HTTPS; the base Compose service does not obtain certificates.
 
-The default port binds to **127.0.0.1**. Use the HTTPS option below to host publicly, or put your own reverse proxy in front of it.
+Docker Compose is the only dependency for the website container. The image installs the website's small, separate requirements and serves Flask through Gunicorn as a non-root user. Use **base Compose alone** with your existing Nginx; the optional Caddy overlay also binds public ports 80/443.
+
+An existing `.env` or exported shell variable overrides these defaults. If you previously used the old defaults, update or remove `PORT=8080`, `PUBLIC_URL`, and `TRUST_PROXY=0` overrides before recreating the service. Preserve your benchmark-directory and other custom settings.
+
+For direct local HTTP testing without Nginx:
+
+```bash
+PUBLIC_URL=http://localhost:28481 TRUST_PROXY=0 docker compose up --build -d
+```
+
+Then open [http://localhost:28481](http://localhost:28481). Keep these overrides when recreating the local service, or put them in a local `.env`. The HTTPS production defaults enable secure cookies and expect the production origin for form submissions.
 
 ```bash
 docker compose logs -f web
@@ -130,7 +140,15 @@ It contains only Random, Greedy, and Oracle, with arcade-v2 Dino/Flappy. This sm
 
 ## Host with a domain and HTTPS
 
-Point the domain's A/AAAA records to your server and allow inbound ports 80 and 443. Copy the environment template:
+### Existing host Nginx (the default deployment)
+
+Point `arcade.afroawi.com` to your server. Add its own server block to the existing Nginx configuration and proxy to `http://127.0.0.1:28481`, preserving `Host` and setting `X-Forwarded-For` to `$remote_addr` and `X-Forwarded-Proto` to `$scheme`. Obtain the domain's certificate on the host, validate Nginx, and reload it. With HTTPS configured, the base `docker compose up --build -d` command uses the matching public origin and secure cookies automatically.
+
+For another domain, override `PUBLIC_URL=https://your-domain` and keep `TRUST_PROXY=1` when exactly one trusted proxy sits in front of the application. The public URL must match the browser origin for form submission. Subpath hosting is not configured; use a domain or subdomain.
+
+### Optional Caddy on a host without an existing reverse proxy
+
+Use this option on a host where public ports 80/443 are available. Point the domain's A/AAAA records to your server and allow inbound ports 80 and 443. Copy the environment template only if you do not already have a `.env`:
 
 ```bash
 cp .env.example .env
@@ -144,7 +162,7 @@ docker compose -f compose.yaml -f compose.https.yaml up --build -d
 
 The optional Caddy service terminates HTTPS and proxies to `web:8000`. The overlay sets the public URL, secure session cookies, and trust for exactly one reverse proxy. Caddy's certificate/config volumes persist across restarts. DNS resolution and certificate issuance must be verified on your actual host; local checks do not establish that a public domain is deployed. See [Caddy's automatic HTTPS requirements](https://caddyserver.com/docs/automatic-https).
 
-If you already run a reverse proxy, use base Compose only, forward to `127.0.0.1:8080`, and set `PUBLIC_URL=https://your-domain` and `TRUST_PROXY=1` only when one trusted proxy sits in front of the application. The public URL must match the browser origin for form submission. Subpath hosting is not configured; use a domain or subdomain.
+If you already run Nginx on this host, use the existing-proxy instructions above instead of starting Caddy.
 
 ## Review suggestions
 
@@ -179,14 +197,14 @@ Choose a new backup filename each time. Keep backups private. `docker compose do
 
 | Variable | Default | Use |
 |---|---|---|
-| `PORT` | `8080` | Host HTTP port |
+| `PORT` | `28481` | Host HTTP port, bound to loopback by default |
 | `HOST_BIND` | `127.0.0.1` | Interface exposed by the base Compose service |
 | `BENCHMARK_DIR` | `./benchmark-data` | Host directory of public JSON/JSONL result files |
 | `REPOSITORY_URL` | This project's GitHub repository | Source/fork/PR links and prepared issue links |
 | `SUBMISSIONS_PER_HOUR` | `5` | New suggestions per client fingerprint per hour |
-| `PUBLIC_DOMAIN` | No production default | Required by the HTTPS overlay |
-| `PUBLIC_URL` | Empty | External origin with your own proxy; set by the HTTPS overlay |
-| `TRUST_PROXY` | `0` | Trust exactly one proxy when set to `1` |
+| `PUBLIC_DOMAIN` | Unset in base Compose; `arcade.afroawi.com` in the example | Required only by the optional Caddy overlay |
+| `PUBLIC_URL` | `https://arcade.afroawi.com` | Public origin; also enables secure cookies for HTTPS |
+| `TRUST_PROXY` | `1` | Trust one host reverse proxy; set to `0` for direct local HTTP testing |
 
 The application's internal `DATA_DIR` defaults to `/data` in Docker. Do not share one SQLite database across separate physical hosts. The project assumes a single self-hosted instance with multiple Gunicorn workers.
 
