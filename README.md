@@ -25,7 +25,8 @@ per game.
 
 ## Quick start
 
-Requires Python 3.10+. The first run downloads both local checkpoints (a few minutes).
+Requires Python 3.10+. The server starts immediately; each local model loads on its first decision.
+The first use of an uncached model downloads its checkpoint (which can take a few minutes).
 
 ```bash
 python3 -m venv .venv && source .venv/bin/activate
@@ -111,6 +112,26 @@ or started the Kev server with `KEV_API_KEY` (see `.env.example` for `KEV_URL`/`
 `KEV_MODEL`/`KEV_CONCURRENCY`). Without it running, Kev just appears greyed out like an unconfigured
 Drex.
 
+## Easy benchmarks
+
+From this folder, run `./benchmark` for an interactive launcher. No activated venv is needed:
+it uses this checkout's `.venv` automatically. `./benchmark --quick` runs a fast, seeded Dino + Flappy
+baseline comparison with progress and ranked tables. Nothing new needs installing.
+
+```bash
+./benchmark                                      # guided setup in a terminal
+./benchmark --quick                              # baselines, 3 identical seeds each
+./benchmark --game dino,flappy --players jev greedy oracle --games 10
+./benchmark --game all --players baselines --games 3 --max-plies 80
+./benchmark --game flappy --players jev greedy --control raw --games 5
+```
+
+The console shows elapsed time, estimated time remaining, current player/seed/tick and score, then
+per-game and overall leaderboards. Use `--json results/run.json --csv results/run.csv` to export;
+`--plain` for log-friendly output; `--no-save` to keep the run out of the saved Benchmarks page.
+All three competition formats still work. The old `bench_*.py` commands now use the same runner.
+See [BENCHMARKING.md](BENCHMARKING.md) for options and interpretation.
+
 ## Running the benchmarks (headless, no browser)
 
 > **Full guide: [BENCHMARKING.md](BENCHMARKING.md)** — the unified `benchmark.py` runner with competition formats
@@ -123,7 +144,7 @@ way to compare players. Run them from the activated venv, from this directory:
 | Script | What it does | Default players (no names given) |
 |---|---|---|
 | `bench.py` | Plays 2048 to the end, N times per player | `random`, `greedy`, `laya`, `jev` |
-| `bench_dino.py` | Plays Dino Run to a crash or the cap, N times per player | `laya`, `jev`, `random`, `oracle` |
+| `bench_dino.py` | Plays Dino Run to a crash or the cap, N times per player | `laya`, `jev`, `random`, `greedy`, `oracle` |
 | `bench_chess.py` | Every pair of the given players plays once, alternating colors | `greedy`, `random` |
 | `bench_flappy.py` | Plays Flappy Bird until a crash or the cap, N runs per player (run *i* uses seed *i*: identical pipes) | `laya`, `jev`, `random`, `greedy`, `oracle` |
 | `bench_sudoku.py` | Solves N seeded puzzles per player (puzzle *i* from seed *i*: identical puzzles) | `laya`, `jev`, `random`, `greedy`, `oracle` |
@@ -139,9 +160,9 @@ python bench_sudoku.py 10 greedy oracle laya dm                  # 10 identical 
 
 Player names: `laya`, `jev`, `drex`, `kev`, `gliner`, `bev`, `dm`, plus each game's own baselines (`random` and
 `greedy` for 2048/Chess; `random` and `oracle` for Dino; `random`, `greedy` and `oracle` for Flappy/Sudoku). The first argument is always the game
-count (2048/Dino) or the max-plies cutoff (Chess). Unlike the web UI, these scripts don't check
-availability first — naming `drex` without `DREX_API_KEY` set, or `kev` without its server running,
-raises an error immediately and stops the whole run rather than skipping just that player.
+count (2048/Dino) or the max-plies cutoff (Chess). These scripts check availability and use the same progress display as `benchmark.py`.
+Unavailable backends are skipped. A player that fails mid-run is excluded from paired comparisons;
+other players continue. Use `--fail-fast` on the unified runner to stop on the first error.
 
 Results print as plain text to the terminal; the `bench_*.py` scripts also record each run to `bench_runs.jsonl` (see [Benchmark runs & the Benchmarks page](#benchmark-runs--the-benchmarks-page)). This is separate from
 the Arena's saved `results_*.json` and the [Traces](#traces) log, which only capture games played
@@ -152,12 +173,13 @@ through the web UI.
 Each game's Arena page runs several auto-play games (or, for Chess, matches) side by side and
 compares players.
 
-- **2048 / Dino Run:** tick the players to include and set **games per player**; every game runs
+- **2048:** tick the players to include and set **games per player**; every game runs
   in parallel with a live mini board/track. **2048** starts every board in a run — every player,
   every repeat — from the same two starting tiles (regenerated fresh on each **Start**), so a lucky
   or unlucky opening doesn't decide the comparison.
-- **Flappy Bird:** same as Dino Run — live mini grids, a decision every 400ms tick, the model's own
-  latency padding the tick.
+- **Dino Run / Flappy Bird:** animated course cards, repeatable seeds, assisted/raw controls and
+  adjustable playback speed. The world waits while a model thinks. Repeat *i* uses the same
+  seed for every player.
 - **Sudoku:** like 2048, every board in a run gets the **same puzzle** (one seed per **Start**), so
   a lucky puzzle can't favor a player. Boards advance as fast as the models answer — no fixed tick.
 - **Chess:** tick 2+ players; every unordered pair plays **matches per pairing** games, alternating
@@ -170,6 +192,8 @@ compares players.
   a `results_*.json` file to reset it.
 - ms/move (or ms/decision) is inflated when many games share one model, because calls to a model
   backend are queued (see Concurrency below). Use it as a rough comparison only.
+- Dino/Flappy results are saved server-side on completion and identified by `arcade-v2` plus
+  control mode, keeping older mechanics and raw/assisted leaderboards separate.
 - The player list comes from the server (`GET /api/<game>/models`), so a newly registered model
   shows up on that game's pages automatically, with no UI changes.
 
@@ -214,76 +238,29 @@ models into a loop, not as a strong 2048 agent.
 
 ## Dino Run
 
-A Chrome-dino-style runner, rendered as a **5-row × 10-column grid of cubes** (2048-style square
-tiles, not emoji on a free-form track). Obstacles move right to left, one column per **400ms
-tick**, and a fresh decision is asked **every tick** — not just when something is about to arrive.
-The dino sits fixed in the leftmost column, 2nd row from the bottom by default, and visibly changes
-row with its action: up on `jump`, down on `duck`. Each obstacle type renders at its own row too —
-🌵 cactus low, 🐦 low bird mid-height, 🦅 high bird at the top — so the board reads at a glance.
+**Desert sprint** (`/dino`, `/dino/play`) is an animated canvas runner: layered desert hills,
+clouds, a pixel dinosaur, cacti and flapping birds. Real vertical collision bounds replace the old
+obstacle/action lookup. A jump follows a five-tick arc (heights 2, 3, 3, 2, 0), and cannot be
+cancelled; ducking reduces the grounded dinosaur's height. Cacti must be jumped, low birds ducked,
+and high birds avoided by staying low. The course speeds up through shorter obstacle spacing.
 
-**Row position is illustrative, not the rule.** With only 3 obstacle types, 3 actions, and 5 rows,
-no literal row-overlap collision system can reproduce "exactly one action is correct per obstacle
-type" — the combinatorics don't fit (worked through in `enginedino.py`'s comments). So the actual
-pass/fail check is still the same fixed lookup table as before, keyed by obstacle *type*; rows are
-there to make the grid legible, and mostly — not perfectly — line up with which action is correct.
+- **Assisted** (default): open track coasts automatically, jumping again while airborne is not
+  offered, and controls that would collide immediately are filtered when a safe choice exists.
+  Near obstacles the model gets a concise physical description and chooses `jump`, `duck`, or `none`.
+  Forced controls and idle ticks do **not** count as model calls.
+- **Raw**: the model picks one of all three controls every tick, with no safety filtering.
+- **Baselines:** random controls, a reactive greedy runner, and a physics-lookahead oracle.
+- **Score:** 10 per obstacle cleared; runs finish on a collision, 100 obstacles, or 2400 ticks.
 
-```
-browser (JS game)  --state (score/cleared/grid)+model-->  server.py  -->  enginedino.py  -->  models.py  -->  the model
-        ^                                                                                          |
-        +--------------------------------------- chosen action ---------------------------------- +
-```
+Both modes use server-authoritative state via `POST /api/dino/games` and
+`POST /api/dino/games/<id>/step`. The browser only animates snapshots. The exact same Python
+physics runs in headless benchmarks. Seed *i* is shared across players; subsequent repeats use
+seed *i + 1*. Results include the seed, control mode, model-call count, and `arcade-v2` version.
 
-1. **Tick loop.** Every 400ms the browser: asks the model for an action, resolves whatever is at
-   distance 0 against it, shifts every other obstacle one column closer, and — on a fixed schedule
-   that tightens with difficulty — spawns a new obstacle at the far column. Several obstacles can
-   be in flight on the grid at once.
-2. **State text** lists everything currently on the grid with its distance, e.g.
-   `distance 0: a cactus on the ground` / `distance 3: a bird flying low, at head height`. Distance
-   0 means "arrives this tick"; nothing needs to be at distance 0 for a decision to be asked.
-3. **Decision.** The model answers "which action — jump, duck, or none?" as a multiple-choice
-   question, every tick, whether or not anything is imminent.
-4. **Resolution.** Exactly one action clears each obstacle type at distance 0 — any other is a
-   crash, no partial credit:
-
-   | Obstacle | Correct action |
-   |---|---|
-   | 🌵 cactus (ground) | `jump` |
-   | 🐦 bird flying low (head height) | `duck` |
-   | 🦅 bird flying high (overhead) | `none` (keep running) |
-
-   Nothing at distance 0 this tick is always safe, whatever the action. The browser is
-   client-authoritative for the grid (same pattern as 2048): the server only ever answers "what's
-   the action for this tick's state?"
-
-**Pacing is a target, not a guarantee.** The 400ms is enforced by padding a *fast* decision back up
-to 400ms; a *slow* one (Drex over the network, or several Arena boards sharing one local model's
-concurrency slot) just takes as long as it takes. `ms/decision` in the Arena reflects that.
-
-**Baselines:** `random` (uniform over the three actions every tick) and `oracle` (always correct
-for whatever's at distance 0 — an upper bound, since it never crashes and only stops at the
-300-obstacle cap or a 4000-tick safety cap).
-
-**Benchmark:** `python bench_dino.py 5` runs the same models headless, no animation.
-
-**Honest takeaway:** this task is harder than it looks for these models, and asking every tick
-(rather than only when something's close) makes that obvious. A 5-game sample under this mechanic:
-
-| Player | Avg score | Cleared per game |
-|---|---|---|
-| random | 4 | 0–1 |
-| Kev-0.8B | 0 | all 0 |
-| Bev-Decider-0.4B | 0 | all 0 |
-| GLiNER2.5-Decide | 12 | mostly 0, one run reached 6 |
-| Laya | 38 | 0–7 |
-| Jev-BERTa | 40 | 2–5 |
-| oracle | 3000 | all 300 (the cap) |
-
-Every model now scores far below what the old one-decision-per-obstacle version reached (which was
-in the hundreds). Reading a small grid of several obstacles at different distances and picking the
-right tick to act on the one at distance 0 is a meaningfully harder task than "here is the next
-obstacle, name its action" — and these are small classifiers with no real temporal or spatial
-reasoning demonstrated elsewhere in this project either. Treat Dino Run, more than ever, as a demo
-of wiring a decision loop together, not a benchmark these models are actually good at.
+The single-run page offers step, auto-play/pause, replayable course seeds and playback speed,
+with the selected control, probabilities and model context alongside the scene. The arena runs
+players side by side and saves finished runs once on the server; stopped runs are not scored.
+Old grid-game scores are kept on disk but excluded from the new leaderboard.
 
 ## Chess
 
@@ -298,8 +275,8 @@ browser (JS)  --{white, black}-->  server.py  --keeps the chess.Board per match-
      +-------------------------------- move played this ply ---------------------------- +
 ```
 
-- **Server-authoritative board.** 2048 and Dino Run mirror their (simple) rules in JS so the
-  browser can apply moves itself. Chess's rules are too intricate to safely duplicate, so each
+- **Server-authoritative board.** 2048 mirrors its rules in JS so the browser can apply moves
+  itself. Dino/Flappy now also keep authoritative state server-side. Chess's rules are too intricate to safely duplicate, so each
   match's `chess.Board` lives on the server (`server.py`'s `MATCHES`), and the browser just asks
   `POST /api/chess/matches/<id>/step` to play the next ply and render whatever FEN comes back.
 - **Shortlisted candidates, like 2048's guarded mode.** A typical position has 20-40 legal moves;
@@ -350,46 +327,30 @@ decision models into a real, rules-correct game loop, not a strong chess engine.
 
 ## Flappy Bird
 
-A **10-row × 12-column grid** that shifts one column left every **400ms tick**, with a fresh
-`flap` / `none` decision asked **every tick** — the same loop as Dino Run, but with real physics
-instead of a lookup table: the bird has a row and a vertical speed (a flap sets it to −2, gravity
-adds 1 per tick up to +2), pipes have a 4-row gap, and a pipe, the ceiling or the floor ends the run.
-The browser is client-authoritative (it mirrors `engineflappy.py`'s rules, like 2048 and Dino Run);
-the server only answers "what's the action for this state?".
+**Sky passage** (`/flappy`, `/flappy/play`) replaces the tile grid with an animated skyline,
+solid pipes, a bird with visible climb/fall motion and a dotted forecast of its selected flight path.
+The underlying discrete physics remain explicit: flap sets vertical speed to −2, gravity adds 1
+up to +2, and the pipe gap is four rows tall. Touching a pipe, ceiling or floor ends the run.
 
-The state text gives the bird's row and speed and the next two pipes (ticks until each reaches the
-bird, and its gap rows). Each option also states where the bird will be next tick — including
-"hits the ceiling" / "hits the floor" — which is the lookahead a small classifier can't compute for itself.
+- **Assisted** (default): the engine simulates the eight possible three-tick flap/coast sequences.
+  It filters collisions and paths that leave no physically possible continuation through the
+  **visible** pipe gaps. The model chooses among the remaining flight plans, guided by their
+  predicted rows and distance from the gap center. Only the first control is applied; it replans
+  next tick. The guard never uses future, unseen pipe spawns.
+- **Raw**: the original `flap` / `none` choice every tick, with no trajectory filter.
+- **Baselines:** random, a reactive greedy controller, and the exact-lookahead oracle. Baselines
+  always use their own policy, regardless of the selected model-control mode.
+- **Score:** 10 per pipe passed; 100-pipe / 2400-tick cap.
 
-**Tuned until it was winnable.** My first constants (gap 4, a pipe every 5 ticks, gaps moving up to
-3 rows) produced pipe sequences that were *impossible* even for an exhaustive oracle — a falling
-bird can commit to a spot from which the next gap is unreachable. Spacing 6 and gap shifts of ≤2
-fixed it: the oracle now reaches the 300-pipe cap on 20 of 20 seeds. Without that check, "the models
-failed" would have been indistinguishable from "the game is broken".
+This is deliberately a model **plus a physics helper** in assisted mode. Its results do not measure
+unaided model control and must be compared separately from raw mode and the old grid version.
+Both the arena and CLI record the mode and `arcade-v2` version. The saved arena leaderboard
+filters by both. Earlier README scores describe different mechanics and have been removed.
 
-**Baselines:** `random`; `greedy` (a fixed rule steering toward the next gap's middle, with 1.5 rows
-of slack because a flap carries the bird ~3 rows); `oracle` (exact dynamic programming over every
-pipe already on the board — an upper bound).
-
-**Honest takeaway** (5 runs, identical pipes per run, `python bench_flappy.py 5 …`):
-
-| Player | Avg score | Pipes passed per run | Died on |
-|---|---|---|---|
-| random | 0 | all 0 | ceiling / floor |
-| Laya | 0 | all 0 | ceiling ×5 |
-| Jev-BERTa | 0 | all 0 | floor ×5 |
-| GLiNER2.5-Decide | 0 | all 0 | ceiling ×5 |
-| Bev-Decider-0.4B | 0 | all 0 | floor ×5 |
-| DecisionMaster | 0 | all 0 | ceiling ×5 |
-| greedy | 40 | 8, 2, 1, 8, 1 | pipe ×4, ceiling ×1 |
-| oracle | 3000 | all 300 (the cap) | — |
-
-**No model passes a single pipe** — they all die before the first one arrives. Sampling 40 random
-states, Laya and GLiNER answered `flap` on **40/40** (Laya's P(flap) only ranges 0.51–0.62, so it
-barely distinguishes situations at all), DecisionMaster on 36/40, while Jev (23/40) and Bev (10/40)
-do vary their answers — just not in a way that keeps a bird alive. Even with the next-tick position
-spelled out in each option, this is a continuous-control task these classifiers can't do.
-Kev wasn't running for this benchmark.
+Like Dino, the server owns the state and seeded RNG (`POST /api/flappy/games`, then
+`POST /api/flappy/games/<id>/step`); the browser renders it with no duplicated physics. You can
+watch one decision at a time, inspect its options/context, pause, change playback speed, or compare
+many players on identical seeded courses.
 
 ## Sudoku
 
@@ -439,12 +400,12 @@ between Jev, GLiNER, Laya and random, which aren't meaningful. Kev wasn't runnin
 <http://localhost:8048/traces> logs and lets you browse **every** model decision, across all five
 games, on its own page.
 
-- **What's captured.** Each call to `/api/2048/decide`, `/api/dino/decide`, or a chess match's
-  `/step` appends one record: `game`, `model`, a `game_id` (2048/Dino: a random id the browser
+- **What's captured.** Each decision/step endpoint (including Dino/Flappy `/games/<id>/step`)
+  appends one record: `game`, `model`, a `game_id` (2048/Dino: a random id the browser
   mints per game/run and sends along; Chess: the match id), the exact request and response bodies,
   and latency. It's server-side, so it captures Arena runs too, not just the single-game pages.
 - **Storage:** `traces.jsonl` — one JSON object per line, append-only, git-ignored. A request
-  reads at most the last 20,000 lines, so a long session can't make the page slow.
+  returns at most 20,000 recent trace lines before applying filters.
 - **Filters:** game, model, game id (partial match), and free-text search over the whole record
   (matches state text, a move, an error message, anything). Click a row to expand the full request
   and response JSON. **Live** (on by default) polls every 4 seconds.
@@ -476,13 +437,16 @@ running 14 games across 7 backends concurrently: 0 errors, server still up.
 | `enginechess.py` | Chess rules (via `python-chess`), move shortlisting, state description, model-backed players |
 | `engineflappy.py` | Flappy Bird physics, state description, model-backed players, exact-DP oracle |
 | `enginesudoku.py` | Sudoku generation (unique solutions, seeded), auto-fill, state description, model-backed players |
-| `server.py` | HTTP server: page routing per game/mode, `/api/<game>/{models,decide,results}`, plus chess's `/api/chess/matches[/​<id>/step]` |
+| `server.py` | HTTP server, pages, model availability, traces/results, Chess/Sudoku sessions, and Dino/Flappy `/games` sessions |
 | `arena_2048.html` / `play_2048.html` | 2048 arena and single-game pages |
 | `arena_dino.html` / `play_dino.html` | Dino Run arena and single-game pages |
 | `arena_chess.html` / `play_chess.html` | Chess arena (round-robin) and one-match pages |
 | `arena_flappy.html` / `play_flappy.html` | Flappy Bird arena and single-game pages |
 | `arena_sudoku.html` / `play_sudoku.html` | Sudoku arena (same puzzle per run) and single-game pages |
-| `style.css` | Shared design for every page |
+| `style.css` | Shared base design |
+| `arcade.css`, `arcade.js` | Shared Dino/Flappy presentation, animation and controls (no game physics) |
+| `benchmark`, `benchmark_console.py` | Venv-aware launcher and dependency-free terminal progress dashboard |
+| `tests/test_arcade.py` | Physics, model-control, API, persistence and benchmark regressions |
 | `.env.example` | Template for your API key (copy to `.env`) |
 | `results_<game>.json` | Saved arena results per game (created on first finish, git-ignored) |
 | `benchmark.py` | Unified headless runner: any game(s) × any players, with `average` / `versus` / `round-robin` formats and an overall leaderboard — see [BENCHMARKING.md](BENCHMARKING.md) |
@@ -522,9 +486,8 @@ running 14 games across 7 backends concurrently: 0 errors, server still up.
 - **Adding a game:** write `engine<name>.py` with a `Player` base class, `model_player()` built on
   `models.get_backend`, a `PLAYERS` dict and `get_player()`; add it to `GAMES` in `server.py`; add
   `arena_<name>.html` / `play_<name>.html` styled with `style.css`, and a nav entry linking to the
-  other pages. If the game is adversarial or otherwise needs rules too complex to trust to JS,
-  follow Chess's pattern: keep the authoritative state server-side (see `server.py`'s `MATCHES`)
-  instead of 2048/Dino's client-side rule mirroring.
+  other pages. Follow the server-authoritative pattern in Chess (`MATCHES`) or Dino/Flappy (`ARCADE`) so browser
+  and headless runs share one engine.
 
 ## Benchmark runs & the Benchmarks page
 
@@ -533,3 +496,9 @@ creates one **run** (printed as `run <id>`) and saves each player's result under
 (see `runs.py`). Open **http://localhost:8048/benchmarks** to browse runs, filter by game, and see each run
 as a ranked table (score bars, game-specific columns; chess shows standings plus every game). The data is
 also at `GET /api/benchmarks` and `GET /api/benchmarks/<run_id>`.
+
+## Verification
+
+Run `.venv/bin/python -B -m unittest discover -s tests -v` for the regression suite. It uses
+local temporary result files and baseline/stub players; it does not download weights or call APIs.
+The oracle regression checks 20 seeded, 100-obstacle/pipe courses for each updated arcade game.

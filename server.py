@@ -1,28 +1,19 @@
-"""Serves all games' pages, their decision APIs, and persisted arena results.
+"""Local Model Arcade HTTP server.
 
-Routes:
-  /                 redirect to /2048
-  /2048             2048 arena (landing)         /2048/play   single 2048 game
-  /dino             Dino Run arena               /dino/play   single Dino Run game
-  /chess            Chess arena                  /chess/play  one match, two chosen models
-  /style.css        shared stylesheet
-  GET  /api/<game>/models    player list + availability
-  GET  /api/<game>/results   saved arena results
-  POST /api/<game>/decide    {model, ...game state} -> the chosen move/action (2048, dino)
-  POST /api/<game>/results   append one finished game's result
-  Chess only (the board is adversarial and stateful, so it's kept server-side per match):
-  POST /api/chess/matches            {white, black} -> {match_id, fen, turn, over, history}
-  POST /api/chess/matches/<id>/step  -> plays the side-to-move's next move, returns the new state
-  /flappy, /flappy/play       Flappy Bird (tick-based, like Dino Run: POST /api/flappy/decide)
-  /sudoku, /sudoku/play       Sudoku (server-authoritative like Chess):
-  POST /api/sudoku/games            {model, seed} -> {game_id, grid, given, ...}
-  POST /api/sudoku/games/<id>/step  -> auto-fills forced cells, asks the model about the next one
-  /traces                     the trace browser page
-  GET  /api/traces?game=&model=&game_id=&q=&limit=   filtered trace log, newest first
+Pages: /<game>, /<game>/play, /benchmarks, /traces.
+Common API: GET /api/<game>/{models,results}; POST /api/<game>/results.
+2048: POST /api/2048/decide; legacy arcade /decide endpoints also remain available.
+Dino/Flappy: POST /api/<game>/games, /games/<id>/step, /games/<id>/close.
+Chess: POST /api/chess/matches, /matches/<id>/step; GET /matches/<id>/candidates.
+Sudoku: POST /api/sudoku/games, /games/<id>/step.
+GET /api/traces and /api/benchmarks[/<run_id>] expose the local logs.
+Dino/Flappy save a result once on genuine completion; closed/unfinished sessions are not saved.
 """
 import contextlib
 import json
 import os
+import random
+from pathlib import Path
 import threading
 import time
 import uuid
@@ -52,6 +43,7 @@ PAGES = {
 }
 _res_lock = threading.Lock()
 MATCHES = {}  # chess match_id -> {board, white, black, history, lock}
+ARCADE = {}  # bounded, server-authoritative Dino/Flappy sessions
 SUDOKU = {}   # sudoku game_id -> {game, model, lock}
 _matches_lock = threading.Lock()
 
@@ -103,14 +95,16 @@ def read_traces(game=None, model=None, game_id=None, q=None, limit=200):
 # models aren't safe to call concurrently. Baseline players (random/greedy/oracle) need no lock.
 BACKEND_IDS = ("laya", "jev", "drex", "kev", "gliner", "bev", "dm")
 _slots = {}
+_slots_lock = threading.Lock()
 
 
 def _slot(model):
     if model not in BACKEND_IDS:
         return contextlib.nullcontext()
-    if model not in _slots:
-        _slots[model] = threading.BoundedSemaphore(get_backend(model).max_concurrency)
-    return _slots[model]
+    with _slots_lock:
+        if model not in _slots:
+            _slots[model] = threading.BoundedSemaphore(get_backend(model).max_concurrency)
+        return _slots[model]
 
 
 def load_results(game):
@@ -128,15 +122,19 @@ class H(BaseHTTPRequestHandler):
         self.send_response(code); self.send_header("Content-Type", ctype); self.end_headers(); self.wfile.write(body)
 
     def _page(self, name):
-        self._send(open(os.path.join(HERE, name), "rb").read(), "text/html")
+        self._send((Path(HERE) / name).read_bytes(), "text/html")
 
     def do_GET(self):
         path = self.path.split("?")[0]
         parts = [p for p in path.split("/") if p]
         if path == "/":
             self.send_response(302); self.send_header("Location", "/2048"); self.end_headers(); return
+        if path in ("/arcade.css", "/arcade.js"):
+            name = path[1:]
+            return self._send((Path(HERE) / name).read_bytes(),
+                              "text/css" if name.endswith("css") else "text/javascript")
         if path == "/style.css":
-            return self._send(open(os.path.join(HERE, "style.css"), "rb").read(), "text/css")
+            return self._send((Path(HERE) / "style.css").read_bytes(), "text/css")
         if path == "/traces":
             return self._page("traces.html")
         if len(parts) == 2 and parts[0] == "api" and parts[1] == "traces":
@@ -179,7 +177,18 @@ class H(BaseHTTPRequestHandler):
             return self.send_error(404)
         game, mod = parts[1], GAMES[parts[1]]
         length = int(self.headers.get("Content-Length") or 0)  # /step is a bodyless POST
-        req = json.loads(self.rfile.read(length)) if length else {}
+        try:
+            req = json.loads(self.rfile.read(length)) if length else {}
+            if not isinstance(req, dict):
+                raise ValueError("expected a JSON object")
+        except (ValueError, UnicodeDecodeError):
+            return self._send({"error": "invalid JSON body"}, code=400)
+
+        if game in ("dino", "flappy") and parts[2] == "games":
+            if len(parts) == 3:
+                return self._new_arcade(game, mod, req)
+            if len(parts) == 5 and parts[4] in ("step", "close"):
+                return self._step_arcade(game, mod, parts[3], close=parts[4] == "close")
 
         if game == "chess" and len(parts) == 3 and parts[2] == "matches":
             return self._new_match(mod, req)
@@ -220,7 +229,7 @@ class H(BaseHTTPRequestHandler):
                         m, probs, state, illegal = player.decide(req["grid"])
                         payload = {"move": m, "probs": probs, "state": state, "illegal_pick": illegal}
                     elif game in ("dino", "flappy"):
-                        a, probs, state = player.decide(req["state"])
+                        a, probs, state = player.decide(req["state"])[:3]
                         payload = {"action": a, "probs": probs, "state": state}
                     else:
                         return self._send({"error": f"{game} is driven through /games, not /decide"}, code=404)
@@ -230,6 +239,86 @@ class H(BaseHTTPRequestHandler):
             log_trace(game, model, req.get("game_id"), req, payload, (time.time() - t0) * 1000)
             return self._send(payload)
         self.send_error(404)
+
+    def _new_arcade(self, kind, mod, req):
+        model, control = req.get("model"), req.get("control", "assisted")
+        if model not in mod.PLAYERS or control not in ("assisted", "raw"):
+            return self._send({"error": "choose a valid player and control mode"}, code=400)
+        ok, why = mod.PLAYERS[model].availability()
+        if not ok:
+            return self._send({"error": why}, code=400)
+        try:
+            seed = int(req.get("seed", 0))
+        except (TypeError, ValueError):
+            return self._send({"error": "seed must be an integer"}, code=400)
+        rng = random.Random(seed)
+        gid = uuid.uuid4().hex[:12]
+        entry = {"kind": kind, "model": model, "seed": seed, "control": control,
+                 "rng": rng, "state": mod.new_game(rng, control), "over": False,
+                 "decisions": 0, "model_calls": 0, "ms": 0, "lock": threading.Lock()}
+        with _matches_lock:
+            if len(ARCADE) >= 256:
+                finished = next((i for i, e in ARCADE.items() if e["over"]), None)
+                if finished:
+                    del ARCADE[finished]
+                else:
+                    return self._send({"error": "too many active runs; stop an existing run first"}, code=429)
+            ARCADE[gid] = entry
+        return self._send({"game_id": gid, "seed": seed, "state": entry["state"], "over": False})
+
+    def _step_arcade(self, kind, mod, gid, close=False):
+        entry = ARCADE.get(gid)
+        if not entry or entry["kind"] != kind:
+            return self._send({"error": "unknown run; start a new game"}, code=404)
+        with entry["lock"]:
+            if close:
+                with _matches_lock:
+                    ARCADE.pop(gid, None)
+                return self._send({"ok": True})
+            if entry["over"]:
+                return self._send(entry["last"])
+            state, model = entry["state"], entry["model"]
+            before = json.loads(json.dumps(state))
+            t0 = time.perf_counter()
+            try:
+                with _slot(model):
+                    decision = mod.get_player(model).decide(state)
+                action, probs, text = decision[:3]
+                meta = decision[3] if len(decision) > 3 else {"choice": action, "model_called": False}
+                reason = mod.step_tick(state, action, entry["rng"])
+            except Exception as e:
+                log_trace(kind, model, gid, {"state": before}, {"error": str(e)}, (time.perf_counter() - t0) * 1000)
+                return self._send({"error": str(e)}, code=502)
+            elapsed = (time.perf_counter() - t0) * 1000
+            entry["decisions"] += 1
+            entry["model_calls"] += int(meta.get("model_called", False))
+            entry["ms"] += elapsed
+            passed = state.get("passed", state.get("cleared", 0))
+            cap = mod.PIPE_CAP if kind == "flappy" else mod.OBSTACLE_CAP
+            over = bool(reason) or passed >= cap or state["tick"] >= mod.TICK_CAP
+            payload = {"game_id": gid, "state": state, "action": action, "probs": probs,
+                       "prompt": text, "decision": meta, "latency_ms": round(elapsed), "over": over,
+                       "reason": reason or ("cap" if over else None), "model_calls": entry["model_calls"],
+                       "decisions": entry["decisions"]}
+            if over:
+                rec = {"model": model, "score": state["score"], "passed": passed, "cleared": passed,
+                       "ticks": state["tick"], "seed": entry["seed"], "control": entry["control"],
+                       "version": mod.VERSION, "model_calls": entry["model_calls"],
+                       "ms_per_move": round(entry["ms"] / entry["decisions"]),
+                       "crash_on": reason, "ts": int(time.time())}
+                with _res_lock:
+                    results = load_results(kind)
+                    results.append(rec)
+                    with open(RESULTS[kind], "w") as f:
+                        json.dump(results, f)
+                payload["result"] = rec
+                entry["over"] = True
+            # JSON snapshot: later ticks must not mutate the cached response.
+            entry["last"] = json.loads(json.dumps(payload))
+            log_trace(kind, model, gid, {"state": before, "control": entry["control"]},
+                      {"action": action, "probs": probs, "state": text, "decision": meta,
+                       "score": state["score"], "over": over}, elapsed)
+            return self._send(payload)
 
     def _new_match(self, mod, req):
         white, black = req.get("white"), req.get("black")
@@ -341,9 +430,6 @@ class H(BaseHTTPRequestHandler):
 
 
 if __name__ == "__main__":
-    for game, mod in GAMES.items():  # preload so the first move isn't slow; backends are shared/cached
-        for n, p in mod.PLAYERS.items():
-            ok, why = p.availability()
-            print(f"{game}/{n}: {'ready' if ok else 'skipped (' + why + ')'}", flush=True) if not ok else mod.get_player(n)
-    print("http://localhost:8048  (2048: /2048, /2048/play — dino: /dino, /dino/play — chess: /chess, /chess/play)", flush=True)
+    # Load each backend on its first decision so pages and baseline runs open immediately.
+    print("Arcade ready at http://localhost:8048 (models load on first use)", flush=True)
     ThreadingHTTPServer(("127.0.0.1", 8048), H).serve_forever()

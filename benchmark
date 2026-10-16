@@ -1,0 +1,7 @@
+#!/bin/sh
+# Use this checkout's environment, independent of the caller's working directory.
+benchmark_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
+if [ -x "$benchmark_dir/.venv/bin/python" ]; then
+    exec "$benchmark_dir/.venv/bin/python" -B "$benchmark_dir/benchmark.py" "$@"
+fi
+exec python3 -B "$benchmark_dir/benchmark.py" "$@"

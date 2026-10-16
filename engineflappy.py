@@ -1,15 +1,11 @@
-"""Flappy Bird on a grid: a 10-row x 12-column board that shifts one column per tick (400ms), with
-a fresh flap/none decision asked every tick. Unlike Dino Run's lookup-table rule, this one is real
-physics: the bird has a row and a vertical speed, pipes have a gap, and hitting a pipe, the
-ceiling or the floor ends the run.
-
-Same shape as the other games: describe the situation, ask a typed choice question, apply it.
-"""
+"""Flappy physics with optional three-tick flight-plan choices and a transparent safety filter."""
 import functools
+import itertools
 import random
 
 from models import BACKENDS, get_backend
 
+VERSION = "arcade-v2"
 ACTIONS = ["flap", "none"]
 ROWS = 10               # row 0 is the top, row 9 the bottom
 COLS = 12               # columns on the board; pipes spawn at the right edge and move left
@@ -19,9 +15,9 @@ FLAP_VY = -2            # a flap sets the vertical speed to this (rows per tick,
 MAX_FALL = 2            # gravity adds 1 per tick up to this
 SPAWN_EVERY = 6         # ticks between pipes
 MAX_GAP_SHIFT = 2       # a pipe's gap moves at most this many rows from the previous one
-TICK_MS = 400
-PIPE_CAP = 300          # run ends here even if nothing crashed
-TICK_CAP = 4000         # hard safety cap for headless runs
+TICK_MS = 180
+PIPE_CAP = 100          # run ends here even if nothing crashed
+TICK_CAP = 2400         # hard safety cap for headless runs
 
 ACTION_DESC = {
     "flap": "flap — rise 2 rows this tick and reset the falling speed",
@@ -38,9 +34,9 @@ def next_motion(row, vy, action):
     return row + vy2, vy2
 
 
-def new_game(rng=random):
-    return {"score": 0, "tick": 0, "passed": 0, "bird_row": ROWS // 2, "vy": 0, "pipes": [],
-            "next_spawn_in": SPAWN_EVERY + 1, "last_gap": (ROWS - GAP) // 2}
+def new_game(rng=random, control="assisted"):
+    return {"score": 0, "tick": 0, "passed": 0, "bird_row": ROWS // 2, "vy": 0, "pipes": [{"col": 10, "gap": 3}],
+            "next_spawn_in": SPAWN_EVERY + 1, "last_gap": (ROWS - GAP) // 2, "control": control, "version": VERSION}
 
 
 def step_tick(state, action, rng=random):
@@ -76,43 +72,104 @@ def upcoming(state):
     return sorted((p for p in state["pipes"] if p["col"] > BIRD_COL), key=lambda p: p["col"])
 
 
+def flight_plans(state):
+    """Simulate 3 controls against visible pipes only; never invent unseen future pipes."""
+    plans = {}
+    for sequence in itertools.product(ACTIONS, repeat=3):
+        row, vy, path, reason = state["bird_row"], state["vy"], [], None
+        for tick, action in enumerate(sequence, 1):
+            row, vy = next_motion(row, vy, action)
+            if not 0 <= row < ROWS:
+                reason = "ceiling" if row < 0 else "floor"
+            for pipe in state["pipes"]:
+                if pipe["col"] - tick == BIRD_COL and not pipe["gap"] <= row < pipe["gap"] + GAP:
+                    reason = "pipe"
+            if reason:
+                break
+            path.append(row)
+        key = "_".join("flap" if a == "flap" else "coast" for a in sequence)
+        plans[key] = {"actions": list(sequence), "path": path, "survived": len(path), "crash": reason}
+    safe = {k: p for k, p in plans.items() if p["crash"] is None}
+    # A locally safe path can still strand the bird outside an approaching gap. Keep plans
+    # whose final state has at least one physically possible continuation through visible pipes.
+    # This guard is explicit assistance, not model reasoning or knowledge of unseen pipes.
+    gaps = {p["col"] - BIRD_COL: p["gap"] for p in state["pipes"] if p["col"] > BIRD_COL}
+    horizon = max(3, max(gaps, default=0) + 2)
+
+    @functools.lru_cache(None)
+    def reachable(tick, row, vy):
+        if tick >= horizon:
+            return True
+        for action in ACTIONS:
+            r, v = next_motion(row, vy, action)
+            gap = gaps.get(tick + 1)
+            if 0 <= r < ROWS and (gap is None or gap <= r < gap + GAP) and reachable(tick + 1, r, v):
+                return True
+        return False
+
+    viable = {}
+    for key, plan in safe.items():
+        row, vy = state["bird_row"], state["vy"]
+        for action in plan["actions"]:
+            row, vy = next_motion(row, vy, action)
+        if reachable(3, row, vy):
+            viable[key] = plan
+    if viable or safe:
+        return viable or safe
+    longest = max(p["survived"] for p in plans.values())
+    return {k: p for k, p in plans.items() if p["survived"] == longest}
+
+
 def describe(state):
     row, vy = state["bird_row"], state["vy"]
-    lines = [f"Flappy Bird. Score {state['score']}, pipes passed {state['passed']}.",
-             f"Grid has {ROWS} rows (row 0 = top, row {ROWS - 1} = bottom). "
-             f"Bird: row {row}, vertical speed {vy} (negative = rising, positive = falling)."]
+    text = f"Bird row {row}, speed {vy}. Row 0 = ceiling, row 9 = floor. "
+    text += "Flap rises 2 rows; coasting accelerates down.\n"
     ups = upcoming(state)
+    for pipe in ups[:2]:
+        text += f"Pipe in {pipe['col'] - BIRD_COL} ticks, safe rows {pipe['gap']}-{pipe['gap'] + GAP - 1}.\n"
     if not ups:
-        lines.append("No pipe ahead yet.")
-    for i, p in enumerate(ups[:2]):
-        n = p["col"] - BIRD_COL
-        lines.append(f"{'Next' if i == 0 else 'Then'} pipe: reaches the bird in {n} tick{'s' if n != 1 else ''} "
-                     f"(1 = this tick), gap is rows {p['gap']}-{p['gap'] + GAP - 1}.")
-    crit = {}
-    for a, desc in ACTION_DESC.items():
-        r, _ = next_motion(row, vy, a)
-        where = "hits the ceiling" if r < 0 else "hits the floor" if r > ROWS - 1 else f"bird will be at row {r}"
-        crit[a] = f"{desc} ({where})"
-    return "\n".join(lines), crit
+        text += "No pipe ahead. Stay near the middle rows.\n"
+    if state.get("control", "assisted") == "raw":
+        crit = {}
+        for action in ACTIONS:
+            r, _ = next_motion(row, vy, action)
+            crit[action] = f"{action}: next row {r}" + (" COLLISION" if not 0 <= r < ROWS else "")
+        return text, crit
+    target = _target_row(state)
+    options = {}
+    for key, plan in flight_plans(state).items():
+        path = " → ".join(str(r) for r in plan["path"])
+        end = plan["path"][-1] if plan["path"] else row
+        options[key] = (f"{key.replace('_', ' / ')}: rows {path}; "
+                        f"ends {abs(end - target):.1f} rows from gap center" +
+                        (f"; hits {plan['crash']}" if plan["crash"] else "; clear for 3 ticks"))
+    return text, options
 
 
 class Player:
-    name = "base"
-    max_concurrency = 1
-    baseline = False
+    name, baseline, max_concurrency = "base", False, 1
 
     @classmethod
     def availability(cls):
         return True, ""
 
     def decide(self, state):
-        state_text, crit = describe(state)
-        pick, probs = self.choose(state_text, crit)
-        if pick not in crit:  # safety net; shouldn't happen with well-behaved backends
-            pick = max(crit, key=lambda k: probs.get(k, 0))
-        return pick, probs, state_text
+        text, options = describe(state)
+        called = len(options) > 1
+        if called:
+            pick, probs = self.choose(text, options)
+            if pick not in options:
+                pick = max(options, key=lambda k: probs.get(k, 0))
+        else:
+            pick = next(iter(options)); probs = {pick: 1.0}
+        raw = state.get("control", "assisted") == "raw"
+        plan = None if raw else flight_plans(state)[pick]
+        action = pick if raw else plan["actions"][0]
+        return action, probs, text, {"choice": pick, "options": options, "model_called": called,
+                                    "path": plan["path"] if plan else [],
+                                    "note": "Raw controls" if raw else "Flight plans + gap reachability guard · replan each tick"}
 
-    def choose(self, state, crit):
+    def choose(self, state, criteria):
         raise NotImplementedError
 
 
@@ -225,9 +282,9 @@ def get_player(name):
     return _cache[name]
 
 
-def play(policy, cap=PIPE_CAP, max_ticks=TICK_CAP, rng=random):
+def play(policy, cap=PIPE_CAP, max_ticks=TICK_CAP, rng=random, control="assisted"):
     """Headless runner for benchmarking: policy(state) -> action. Returns (score, pipes passed, why)."""
-    state = new_game(rng)
+    state = new_game(rng, control)
     why = None
     while state["passed"] < cap and state["tick"] < max_ticks:
         why = step_tick(state, policy(state), rng)

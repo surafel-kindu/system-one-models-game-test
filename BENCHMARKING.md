@@ -1,105 +1,135 @@
-# Benchmarking (headless, no UI)
+# Benchmarking
 
-Run any game with any players straight from the terminal — no server, no browser. Every run is saved
-to `bench_runs.jsonl` as one **run** and can be browsed at **http://localhost:8048/benchmarks** (start
-the server with `python server.py`). Back to the [main README](README.md).
+From this folder, use the launcher. It finds this checkout's `.venv`, so you do not need to activate it.
+No extra terminal UI packages are required.
 
 ```bash
-source .venv/bin/activate          # the venv has python-chess and the model packages
-python benchmark.py --game 2048 --players laya jev random greedy --games 10
+./benchmark
 ```
 
-`benchmark.py` is the unified runner described here. The older per-game scripts (`bench.py`, `bench_dino.py`,
-`bench_chess.py`, `bench_flappy.py`, `bench_sudoku.py`) still work and are documented in the README; they
-run one simple comparison per game, while `benchmark.py` adds competition formats and multi-game suites.
+With no flags in an interactive terminal, a short wizard offers a quick baseline check, a model
+comparison on Dino + Flappy, or a five-game suite. Choose players, seed count and assisted/raw
+control. It prints the equivalent command so you can repeat it later.
+
+For a quick run with no questions:
+
+```bash
+./benchmark --quick
+```
+
+This plays three seeded games per baseline (`random`, `greedy`, `oracle`) on Dino + Flappy.
+It does not load model weights or make hosted API calls. To invoke Python directly, use
+`python benchmark.py` from the activated venv. With no flags in a non-interactive shell, the
+original 2048/all-players defaults apply; use explicit flags in scripts and CI.
+
+## Console display
+
+In a terminal, a live status line shows a progress bar, completed games, current player, seed,
+step/ply, score, elapsed time and an approximate ETA. It keeps updating while a model is loading
+or answering. Each completed seed prints its score; each game ends with a ranked table including
+score bars, mean, standard deviation, median, worst and best. Multi-game suites end with an overall
+leaderboard. ETA is based on completed games, so mixed model speeds can make it inaccurate.
+
+Redirected output and `--plain` use clean line-based progress. `NO_COLOR` disables ANSI color.
+Ctrl+C exits with status 130. Completed player checkpoints remain in the saved run, marked
+`interrupted`; incomplete players do not appear in final paired rankings.
+
+## Commands
+
+```bash
+# See player availability without loading weights
+./benchmark --game all --list
+
+# Compare a few players on identical courses
+./benchmark --game dino,flappy --players jev greedy oracle --games 10 --seed 42
+
+# All games, using only their baselines
+./benchmark --game all --players baselines --games 5 --max-plies 100
+
+# Every available model and each game's baselines
+./benchmark --game all --players all --games 5
+
+# Unaided model controls, saved separately from assisted runs
+./benchmark --game flappy --players jev greedy --control raw --games 10
+
+# A seed-by-seed competition
+./benchmark --game sudoku --players jev random greedy oracle --format versus --games 20
+
+# Pairwise competition (Chess always plays real matches in both colors)
+./benchmark --game 2048 --players laya jev greedy --format round-robin --games 10
+./benchmark --game chess --players jev greedy random --rounds 2 --max-plies 150
+
+# Exports also work with --no-save
+./benchmark --quick --json results/quick.json --csv results/quick.csv
+./benchmark --quick --plain --no-save
+```
 
 ## Options
 
 | Flag | Default | Meaning |
 |---|---|---|
-| `--game` | `2048` | `2048`, `dino`, `flappy`, `sudoku`, `chess`, a comma list (`2048,flappy`), or `all` |
-| `--players` | `all` | Player ids (`laya jev drex kev gliner bev dm random greedy oracle`) or `all` |
-| `--format` | `average` | `average`, `versus` or `round-robin` (see below) |
-| `--games` | `5` | Seeded games per player (single-player games) |
-| `--rounds` | `1` | Chess: games per pair, per color |
-| `--max-plies` | `200` | Chess: ply cap (reaching it is a draw) |
-| `--seed` | `0` | First seed; game *i* uses seed `seed + i` for **every** player |
-| `--no-save` | off | Print only; don't write `bench_runs.jsonl` |
+| `--game` | `2048` | A game, comma-separated games, or `all` |
+| `--players` | `all` | Space-separated ids, `all`, or `baselines` |
+| `--games` | `5` | Seeded runs per player; `--quick` defaults to 3 |
+| `--seed` | `0` | Run *i* uses seed `seed + i` for every player |
+| `--control` | `assisted` | `assisted` or `raw` for Dino/Flappy models |
+| `--format` | `average` | `average`, `versus`, `round-robin` |
+| `--rounds` | `1` | Chess games per pair **per color** |
+| `--max-plies` | `200` | Chess draw cutoff |
+| `--quick` | off | Dino + Flappy with baselines, no questions |
+| `--list` | off | Player availability, no weights loaded |
+| `--plain` | off | Line-based console output |
+| `--fail-fast` | off | Stop on the first failed player/match |
+| `--no-save` | off | Do not append to `bench_runs.jsonl` |
+| `--json PATH` | none | Full run metadata, checkpoints, result rows and status |
+| `--csv PATH` | none | Result rows; lists/dicts are JSON inside CSV cells |
 
-**Players.** `all` means every model plus the baselines that game has. Baselines differ per game:
-`random`/`greedy` (2048, Chess), `random`/`oracle` (Dino), `random`/`greedy`/`oracle` (Flappy, Sudoku).
-A player that is unavailable (e.g. `drex` without `DREX_API_KEY`, `kev` without its server running) or that
-a game doesn't have is **skipped with a note**, not a crash — so `--game all --players all` just works.
+Player ids: `laya`, `jev`, `drex`, `kev`, `gliner`, `bev`, `dm`. Each game also has `random` and
+`greedy`; Dino, Flappy and Sudoku have `oracle`. Missing or unconfigured players are skipped
+with a reason. An error while playing excludes that player's incomplete seed set, prints the error,
+and continues the others. A partial or empty run returns exit status 1; success returns 0.
+Counts must be positive; invalid games and player names return a CLI error.
 
-**Fair comparison.** Seeds are shared: game *i* uses the same start board / pipe sequence / puzzle / obstacle
-sequence for every player, so a lucky seed can't favor one model.
+## What the formats mean
 
-## Competition formats
+- **average:** compare mean score over the same seeds; spread statistics show consistency.
+- **versus:** the best score on each seed wins; ties split that seed. Rank by win share.
+- **round-robin:** compare every pair seed by seed, with win = 1 and draw = ½. The matrix shows
+  row-player W-D-L against the column player. Chess plays actual matches instead, alternating colors.
 
-### `average` — many games, take the mean (default)
-Each player plays the same `--games` seeded games. Reports **mean, std, median, worst, best**. Use it to
-rank players by typical performance and see how consistent they are.
+A multi-game suite turns each game's result into 0–100 points (`average`: relative to that game's
+best mean; `versus`: win share; `round-robin`: points rate), then averages them. A player missing
+from a game is averaged over only the games it played; the per-game columns expose this. Do not
+interpret a one-game oracle's overall score as a fair five-game comparison to a model in all games.
 
-```bash
-python benchmark.py --game sudoku --players all --games 20
-```
+## Fair courses and assisted control
 
-### `versus` — everyone in one group, win each seed
-All players are in a single group; on each seed the **highest score wins that seed** (ties split it).
-Reports seeds won, win share and mean score. Use it when you care about "who comes first" rather than by
-how much — a single huge score can't dominate it the way it can a mean.
+The environment has its own seeded RNG; randomized policies use a separate reproducible stream.
+Browser and CLI Dino/Flappy use the **same Python engines**. Their results record `arcade-v2` and
+control mode, while older results remain identifiable as earlier mechanics. Caps are 100 obstacles
+or pipes and 2400 ticks. Baselines always use their own policy in either control mode.
 
-```bash
-python benchmark.py --game flappy --format versus --games 30 --players laya jev greedy oracle
-```
+**Assisted Dino:** coasts on empty track and filters immediately fatal controls. The model times
+nearby obstacles with jump momentum and real collision bounds. Idle/forced ticks skip the model.
 
-### `round-robin` — every pair head-to-head
-Every pair of players meets directly and you get **W-D-L, points (win = 1, draw = ½) and a matrix** of
-each player against every other.
-- *Single-player games:* a pair is compared seed by seed (higher score wins that seed).
-- *Chess:* real games. Each pair plays `--rounds` games **per color** (so `--rounds 2` = 4 games per pair),
-  and a game that hits `--max-plies` is a draw.
+**Assisted Flappy:** the model ranks three-tick flight paths. A physics helper filters paths that
+collide or leave no reachable continuation through visible pipe gaps; future spawns are unknown.
+Only the first control is applied before replanning. This measures the model with assistance,
+not unaided motor control. **Raw** mode removes these guards and asks every tick. Compare the
+modes separately. Saved rows include average decisions, model calls, and ms/decision; the latter
+includes local policy work and excludes browser playback delays.
 
-```bash
-python benchmark.py --game 2048 --format round-robin --games 10 --players laya jev gliner bev
-python benchmark.py --game chess --rounds 2 --players laya jev greedy random --max-plies 150
-```
-(Chess is two-player, so any `--format` plays as round-robin.)
+## Saved results
 
-### Multi-game suite — all games, one overall leaderboard
-Give several games (or `all`) and the runner plays each one in the chosen format, then ranks everyone
-**overall**: each game turns into 0–100 points per player (`average`: mean score relative to the game's best;
-`versus`: win share; `round-robin`: points rate), and the overall score is the mean across games. A player
-missing from a game (not available / no such baseline) is averaged over only the games it played.
+Each run has an id, parameters, versions, control mode, seed range, per-player raw scores,
+summary statistics and final status in `bench_runs.jsonl`. Completed player checkpoints survive
+interruption. Final rows replace checkpoints in the browser display. Chess saves every match plus
+per-player standings. These are separate from Arena scores and decision traces.
 
-```bash
-python benchmark.py --game all --players all --games 5                      # everything
-python benchmark.py --game 2048,dino,flappy --format versus --games 10 --players laya jev oracle
-```
+Start `python server.py`, then open **http://localhost:8048/benchmarks** to inspect runs.
+The same data is at `GET /api/benchmarks` and `GET /api/benchmarks/<run_id>`.
 
-## Output
-
-```
-== sudoku · round-robin · 6 seeded games × 3 players ==
-player  points  rate  oracle  greedy  random
-oracle    10.5   88%       ·   3-3-0   6-0-0
-greedy     7.5   62%   0-3-3       ·   6-0-0
-random     0.0    0%   0-0-6   0-0-6       ·
-  (matrix cells are W-D-L of the row player against the column player)
-```
-
-Each run prints `run <id>`. Saved records hold per-player mean/std/median/min/max, win share, points rate,
-the raw per-seed `scores`, and game extras (`avg_best_tile`, `avg_pipes`, `avg_cleared`, `avg_mistakes`,
-`avg_solved`…); chess also stores every game (white, black, result, reason, plies). The data is available at
-`GET /api/benchmarks` and `GET /api/benchmarks/<run_id>`.
-
-## Tips
-
-- **Timing:** hosted/large models are slow (Chess especially — up to 14 candidates per move). Start with
-  `--games 3` or `--max-plies 60` to sanity-check, then scale up.
-- **Reproduce a run:** reuse the same `--seed` and `--games`; the run's parameters are shown on the
-  Benchmarks page.
-- **Baseline sanity check:** `oracle` should top Dino/Flappy/Sudoku and `random` should sit at the bottom;
-  if not, something is wrong with the setup, not the models.
-- **Compare across days/models:** run with `--seed 0 --games 20` each time, then compare runs on the
-  Benchmarks page.
+The older commands (`bench.py`, `bench_dino.py`, `bench_flappy.py`, `bench_sudoku.py`,
+`bench_chess.py`) keep their positional arguments and now delegate to this runner for progress,
+availability checks and persistence. `bench.py` still includes Random and Greedy automatically.
+Chess now plays both colors per pair. Use the unified CLI for exports and additional flags.

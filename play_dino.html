@@ -1,117 +1,104 @@
 <!doctype html>
 <html lang="en">
+<head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dino Run — Single Game</title>
-<link rel=stylesheet href="/style.css">
-<style>.play{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:16px}</style>
-<nav><div class=games><b>2048 · AI</b><a href="/2048">2048</a><a class=on href="/dino">Dino Run</a><a href="/chess">Chess</a><a href="/flappy">Flappy</a><a href="/sudoku">Sudoku</a></div>
-<div class=modes><a href="/dino">Arena</a><a class=on href="/dino/play">Single game</a><a href="/benchmarks">Benchmarks</a><a href="/traces">Traces</a></div></nav>
-<main>
-<h1>Dino Run — single game</h1>
-<p class=sub>A 5×10 grid of cubes shifts one column toward the dino every 400ms; a fresh decision is asked every tick, not just when something is close. The dino sits in the leftmost column, 2nd row from the bottom, and moves up on jump / down on duck.</p>
-<p class=legend>Rules: 🌵 cactus needs <b>jump</b> · 🐦 low bird needs <b>duck</b> · 🦅 high bird needs <b>none</b> (run). Whatever sits at distance 0 arrives this tick — the wrong action for it is a crash. Row height is illustrative (cactus low, low-bird mid, high-bird top); the pass/fail rule is always by obstacle type, not row overlap.</p>
-
-<div class=panel>
-  <div class=ctl>
-    <label>Player <select id=model></select></label>
-    <button id=step>Step</button><button id=auto>Auto-play</button><button id=reset class=ghost>New run</button>
-    <span id=msg class=sub style="margin:0"></span>
-  </div>
-</div>
-
-<div class=play>
-  <div class=panel>
-    <h2>Grid</h2>
-    <div class="dinogrid big" id=grid></div>
-    <div class=stats><div>Score<b id=score>0</b></div><div>Cleared<b id=cleared>0</b></div><div>Tick<b id=tick>0</b></div><div>Latency<b id=lat>–</b></div></div>
-  </div>
-  <div>
-    <div class=panel><h2>Model's decision</h2><div id=probs class=empty>Press Step or Auto-play.</div></div>
-    <div class=panel><h2>State sent to the model</h2><pre id=state>–</pre></div>
-  </div>
-</div>
-</main>
-
-<script>
-const $=id=>document.getElementById(id);
-const EMOJI={cactus:'🌵',bird_low:'🐦',bird_high:'🦅'};
-const CORRECT={cactus:'jump',bird_low:'duck',bird_high:'none'};
-const TICK_MS=400, GRID_LEN=10, ROWS=5, SPAWN_GAP_START=5, SPAWN_GAP_MIN=2, OBSTACLE_CAP=300, TICK_CAP=4000;
-// Rows are visual only (0=bottom..4=top) — the pass/fail rule stays the CORRECT lookup above, not row overlap.
-const DINO_ROW={none:1,jump:4,duck:0}, OBSTACLE_ROW={cactus:0,bird_low:2,bird_high:4};
-function spawnGapFor(cleared){return Math.max(SPAWN_GAP_MIN, SPAWN_GAP_START-Math.floor(cleared/15))}
-function genObstacle(cleared){const birdP=Math.min(0.2+cleared*0.01,0.7);if(Math.random()>birdP)return 'cactus';return Math.random()<0.5?'bird_low':'bird_high'}
-function stepTick(state,action){
-  const arrived=state.obstacles.filter(o=>o.col===0);
-  for(const o of arrived)if(CORRECT[o.type]!==action)return o.type;
-  state.cleared+=arrived.length;state.score+=10*arrived.length;
-  state.obstacles=state.obstacles.filter(o=>o.col>0);
-  state.obstacles.forEach(o=>o.col--);
-  state.nextSpawnIn--;
-  if(state.nextSpawnIn<=0){state.obstacles.push({type:genObstacle(state.cleared),col:GRID_LEN-1});state.nextSpawnIn=spawnGapFor(state.cleared)}
-  state.tick++;
-  return null;
-}
-function newState(){return {score:0,cleared:0,tick:0,obstacles:[],nextSpawnIn:SPAWN_GAP_START}}
-
-let state,gameId,auto=false,busy=false,over=false,lastAction=null,crashedType=null;
-const newId=()=>(crypto.randomUUID?crypto.randomUUID():Math.random().toString(36).slice(2));
-function reset(){state=newState();gameId=newId();over=false;lastAction=null;crashedType=null;$('msg').textContent='';draw()}
-function draw(){
-  $('score').textContent=state.score;$('cleared').textContent=state.cleared;$('tick').textContent=state.tick;
-  const dinoRow=DINO_ROW[lastAction||'none'];
-  const occ={};state.obstacles.forEach(o=>occ[o.col+','+OBSTACLE_ROW[o.type]]=o);
-  let html='';
-  for(let cssR=0;cssR<ROWS;cssR++){
-    const gameRow=ROWS-1-cssR;
-    for(let c=0;c<GRID_LEN;c++){
-      let cls='cube',content='';
-      if(c===0&&gameRow===dinoRow){cls+=' dino';content='🦖'}
-      const o=occ[c+','+gameRow];
-      if(o){cls+=' ob-'+o.type;content=EMOJI[o.type];if(c===0&&over&&crashedType===o.type)cls+=' crash'}
-      html+=`<div class="${cls}">${content}</div>`;
-    }
-  }
-  $('grid').innerHTML=html;
-}
-function stop(){auto=false;$('auto').textContent='Auto-play'}
-function sleep(ms){return new Promise(r=>setTimeout(r,ms))}
-async function tick(){
-  if(busy||over)return;busy=true;const t0=performance.now();
-  let r;try{r=await (await fetch('/api/dino/decide',{method:'POST',body:JSON.stringify({model:$('model').value,state,game_id:gameId})})).json()}catch(e){r={error:String(e)}}
-  const elapsed=performance.now()-t0;busy=false;
-  if(r.error){$('msg').innerHTML=`<span class=err>${r.error}</span>`;stop();return elapsed}
-  $('lat').textContent=Math.round(elapsed)+' ms';
-  const ps=r.probs;
-  $('probs').innerHTML=Object.entries(ps).map(([k,v])=>`<div class=pr>${k} · ${(v*100).toFixed(0)}%${k==r.action?' ← chosen':''}<div class="bar ${k==r.action?'pick':''}"><i style="width:${v*100}%"></i></div></div>`).join('')||`<b>${r.action}</b>`;
-  $('state').textContent=r.state;
-  lastAction=r.action;
-  const crashedOn=stepTick(state,r.action);
-  if(crashedOn){over=true;crashedType=crashedOn;draw();stop();$('msg').innerHTML=`Crashed: <b>${r.action}</b> was wrong for ${crashedOn.replace('_',' ')} at distance 0.`;return elapsed}
-  draw();
-  if(state.cleared>=OBSTACLE_CAP){over=true;stop();$('msg').textContent=`Reached the ${OBSTACLE_CAP}-obstacle cap.`}
-  if(state.tick>=TICK_CAP){over=true;stop();$('msg').textContent=`Reached the ${TICK_CAP}-tick cap.`}
-  return elapsed;
-}
-async function step(){await tick()}
-async function loop(){
-  while(auto&&!over){
-    const elapsed=await tick();
-    if(!auto||over)break;
-    const wait=TICK_MS-(elapsed||0);
-    if(wait>0)await sleep(wait);
-  }
-  stop();
-}
-$('step').onclick=step;
-$('auto').onclick=()=>{auto=!auto;$('auto').textContent=auto?'Pause':'Auto-play';if(auto)loop()};
-$('reset').onclick=()=>{stop();reset()};
-$('model').onchange=()=>{stop();reset()};
-fetch('/api/dino/models').then(r=>r.json()).then(ms=>{
-  $('model').innerHTML=ms.map(m=>`<option value=${m.id} ${m.available?'':'disabled'}>${m.label}${m.available?'':' — '+m.reason}</option>`).join('');
-  $('model').value=(ms.find(m=>m.available&&!m.baseline)||ms[0]).id;
-});
-reset();
+<title>Desert sprint · Model Arcade</title>
+<link rel="stylesheet" href="/arcade.css">
+<script defer src="/arcade.js">
 </script>
+</head>
+<body class="arcade" data-game="dino" data-mode="play">
+<div class="arcade-shell">
+<nav>
+<div class="games">
+<b class="brand"><span class="brand-mark" aria-hidden="true">··</span><span>MODEL<span class="brand-sub">ARCADE/LAB</span></span></b>
+<a class="" href="/2048">2048</a>
+<a class="on" href="/dino">Dino Run</a>
+<a class="" href="/chess">Chess</a>
+<a class="" href="/flappy">Flappy</a>
+<a class="" href="/sudoku">Sudoku</a>
+</div>
+<div class="modes">
+<a class="" href="/dino">Arena</a>
+<a class="on" href="/dino/play">Single game</a>
+<a href="/benchmarks">Benchmarks</a>
+<a href="/traces">Traces</a>
+</div>
+</nav>
+<main>
+<header class="hero">
+<div class="hero-topline"><span>EXPERIMENT / 02</span><span>SYSTEM 1 · MODEL ARCADE</span></div>
+<h1 class="masthead"><span class="sr-only">Dino Run</span><svg aria-hidden="true" focusable="false" viewBox="0 0 630 84" fill="none" stroke="currentColor" stroke-width="12" stroke-linejoin="bevel" stroke-linecap="square"><path transform="translate(0,0)" d="M10 9H44L59 24V58L44 73H10Z"/><path transform="translate(80,0)" d="M10 9H59 M34 9V73 M10 73H59"/><path transform="translate(160,0)" d="M10 73V9H19L51 73H59V9"/><path transform="translate(240,0)" d="M22 9H47L59 21V61L47 73H22L10 61V21Z"/><path transform="translate(320,0)" d="M8 73H60"/><path transform="translate(400,0)" d="M10 73V9H47L59 21V34L47 46H10 M36 46L60 73"/><path transform="translate(480,0)" d="M10 9V61L22 73H47L59 61V9"/><path transform="translate(560,0)" d="M10 73V9H19L51 73H59V9"/></svg></h1>
+<div class="hero-bottom"><div class="hero-description"><span class="section-marker" aria-hidden="true">■</span><p>Read the terrain. Time the jump. Watch a small decision model navigate cacti and low-flying birds through the desert.</p></div><div class="hero-index"><span>SINGLE GAME<br><b>LIVE / 02</b></span><span class="index-arrow" aria-hidden="true">↗</span></div></div>
+</header>
+<section class="panel controls" aria-label="Game controls">
+<div class="control-row ctl">
+<label>Player<select id="model" disabled>
+<option>Loading players…</option>
+</select>
+</label>
+<label>Control<select id="control">
+<option value="assisted">Assisted · plan ahead</option>
+<option value="raw">Raw · every control</option>
+</select>
+</label>
+<label>Course seed<input id="seed" type="number" value="42" step="1">
+</label>
+<label>Playback<select id="speed">
+<option value="360">Relaxed</option>
+<option value="180" selected>Normal</option>
+<option value="80">Fast</option>
+<option value="0">Instant</option>
+</select>
+</label>
+<div class="control-actions">
+<button id="step" disabled>One step</button>
+<button id="auto" disabled>Auto-play</button>
+<button id="reset" class="ghost" disabled>New run</button>
+</div>
+</div>
+<p id="control-help" class="help">
+</p>
+<div id="status" class="run-status" role="status" aria-live="polite">Connecting to the arcade…</div>
+<div id="notice" class="notice" role="alert">
+</div>
+</section>
+<div class="single-layout">
+<div class="single-stage">
+<div id="games">
+</div>
+<div class="metrics">
+<div class="metric">Score<b id="score">0</b>
+</div>
+<div class="metric">Cleared<b id="passed">0</b>
+</div>
+<div class="metric">Model calls<b id="calls">0</b>
+</div>
+<div class="metric">Decision<b id="latency">—</b>
+</div>
+</div>
+<ol id="history" class="history" aria-label="Recent controls">
+</ol>
+</div>
+<aside class="panel decision-panel">
+<div class="eyebrow">Inside the decision</div>
+<h2 id="decision-title">Ready when you are</h2>
+<div id="decision-note" class="decision-note">Take a step to see the model's options and probabilities.</div>
+<div id="choices">
+</div>
+<details>
+<summary>Inspect the model's context</summary>
+<pre id="context">No decision yet.</pre>
+</details>
+</aside>
+</div>
+<footer>
+<span><span class="footer-cross" aria-hidden="true">✳</span> SAME SEED. SAME COURSE. DIFFERENT DECISIONS.</span>
+<span>
+<a href="/traces">Explore decision traces ↗</a> &nbsp; · &nbsp; ARCADE/LAB · EXP. 02</span>
+</footer>
+</main>
+</div>
+</body>
 </html>

@@ -19,16 +19,8 @@ def greedy(g):
     return max(l, key=lambda m: (move(g, m)[1], sum(v == 0 for r in move(g, m)[0] for v in r))) if l else None
 
 if __name__ == "__main__":
-    n = int(sys.argv[1]) if len(sys.argv) > 1 else 3
-    which = sys.argv[2:] or ["laya", "jev"]
-    pol = {"random": rnd, "greedy": greedy}
-    for w in which:
-        if w in pol:
-            continue
-        p = get_player(w); pol[w] = (lambda p: lambda g: p.decide(g)[0])(p)
-    run = Run("2048", games=n, players=which)
-    print(f"run {run.id}")
-    for name, p in pol.items():
-        t = time.time(); r = [play(p, s) for s in range(n)]
-        run.result(name, games=n, avg_score=sum(x[0] for x in r)/n, best_tiles=[x[1] for x in r], seconds=round(time.time()-t), scores=[x[0] for x in r])
-        print(f"{name:7s} avg score {sum(x[0] for x in r)/n:7.0f}  best tile {[x[1] for x in r]}  {time.time()-t:.0f}s", flush=True)
+    from benchmark import main
+    count = sys.argv[1] if len(sys.argv) > 1 else "5"
+    players = sys.argv[2:] or ['laya', 'jev', 'random', 'greedy']
+    players = list(dict.fromkeys(["random", "greedy"] + players))
+    raise SystemExit(main(["--game", "2048", "--games", count, "--players", *players]))

@@ -252,9 +252,11 @@ class KevBackend(Backend):
 BACKENDS = {"laya": LayaBackend, "jev": JevBackend, "drex": DrexBackend, "kev": KevBackend,
             "gliner": GlinerBackend, "bev": BevBackend, "dm": DecisionMasterBackend}
 _cache = {}
+_cache_lock = threading.Lock()
 
 
 def get_backend(name):
-    if name not in _cache:
-        _cache[name] = BACKENDS[name]()
-    return _cache[name]
+    with _cache_lock:
+        if name not in _cache:
+            _cache[name] = BACKENDS[name]()
+        return _cache[name]
