@@ -1,0 +1,44 @@
+name: Suggest a model
+description: Propose a decision model or backend for the arcade.
+title: "[Model] "
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Model name
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source URL
+      description: Hugging Face, GitHub, documentation, or another public source.
+    validations:
+      required: true
+  - type: input
+    id: creator
+    attributes:
+      label: Creator / author and public profile
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What is it, and why test it?
+    validations:
+      required: true
+  - type: textarea
+    id: instructions
+    attributes:
+      label: Setup and integration
+      description: Include installation/API usage, checkpoint, input/output shape, dependencies, hardware, and access requirements. Do not include credentials.
+    validations:
+      required: true
+  - type: input
+    id: license
+    attributes:
+      label: License and access requirements
+  - type: input
+    id: reference
+    attributes:
+      label: Website suggestion reference (optional)

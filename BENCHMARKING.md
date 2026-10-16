@@ -129,6 +129,17 @@ per-player standings. These are separate from Arena scores and decision traces.
 Start `python server.py`, then open **http://localhost:8048/benchmarks** to inspect runs.
 The same data is at `GET /api/benchmarks` and `GET /api/benchmarks/<run_id>`.
 
+For a separately hosted result explorer, see [website/README.md](website/README.md). It reads JSONL logs and full JSON exports from a mounted benchmark folder, without loading models or serving the arcade. Export directly into its default data directory:
+
+```bash
+./benchmark --game dino,flappy --players jev greedy oracle --games 10 --seed 42 \
+  --json website/benchmark-data/comparison.json
+cd website
+docker compose up --build -d
+```
+
+Open <http://localhost:8080/benchmarks>. New result files appear on refresh without rebuilding. To copy an existing log, run `python3 tools/import_benchmarks.py ../bench_runs.jsonl` from `website/`. The hosted explorer labels legacy records and keeps control modes, versions, formats, and game coverage visible.
+
 The older commands (`bench.py`, `bench_dino.py`, `bench_flappy.py`, `bench_sudoku.py`,
 `bench_chess.py`) keep their positional arguments and now delegate to this runner for progress,
 availability checks and persistence. `bench.py` still includes Random and Greedy automatically.

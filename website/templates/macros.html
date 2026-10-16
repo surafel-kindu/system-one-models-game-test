@@ -1,0 +1,12 @@
+{% macro heading(word, title, kicker, description) %}
+<header class="page-heading"><div class="eyebrow topline"><span>{{ kicker }}</span><span>MODEL ARCADE / OPEN RESEARCH</span></div><h1 class="vector-heading"><span class="sr-only">{{ title }}</span>{{ lettering(word) }}</h1><div class="heading-description"><span class="square" aria-hidden="true"></span><p>{{ description }}</p><span class="heading-arrow" aria-hidden="true">↗</span></div></header>
+{% endmacro %}
+{% macro code(text) %}<div class="code-block"><button type="button" class="copy-button" aria-label="Copy command">Copy</button><pre><code>{{ text }}</code></pre></div>{% endmacro %}
+{% macro game_art(game) %}
+<div class="game-art art-{{ game.id }}" aria-hidden="true">
+{% if game.id=='2048' %}<div class="tile-art"><i>2</i><i>4</i><i>8</i><i>16</i></div>
+{% elif game.id=='chess' %}<span class="chess-art">♞</span><div class="chess-checkers"></div>
+{% elif game.id=='sudoku' %}<span class="sudoku-art">1 2 3<br>4 <b>5</b> 6<br>7 8 9</span>
+{% elif game.id=='dino' %}<svg viewBox="0 0 200 100" fill="currentColor"><path d="M45 67V42H56V18H96V24H101V43H77V53H90V60H73V76H64V86H54V71H43L25 54V42H31L40 57H45Z"/><path d="M139 79V38H148V52H156V35H163V61H148V79Z"/><path d="M15 87H183" fill="none" stroke="currentColor"/><rect x="84" y="25" width="5" height="5" fill="#edede7"/></svg>
+{% else %}<svg viewBox="0 0 200 100" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 63C41 20 66 83 111 42" stroke="#fb6b1a" stroke-dasharray="4 4"/><path d="M133 0V28H161V0M133 100V65H161V100" fill="#bcbdb1"/><path d="M64 44C62 27 88 24 93 38L107 44L94 51C88 62 63 58 64 44Z" fill="#ff6b1a"/><circle cx="88" cy="38" r="2" fill="currentColor"/></svg>{% endif %}
+</div>{% endmacro %}

@@ -1,0 +1,13 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="description" content="An open research arcade for small decision models. Explore reproducible benchmarks and contribute a model or a game.">
+<meta name="theme-color" content="#e7e7e2"><meta name="application-name" content="Model Arcade Lab"><title>{{ title }} · Model Arcade Lab</title>
+<link rel="icon" href="{{ url_for('static',filename='favicon.svg') }}" type="image/svg+xml">
+<link rel="stylesheet" href="{{ url_for('static',filename='site.css') }}"><script defer src="{{ url_for('static',filename='site.js') }}"></script>{% block scripts %}{% endblock %}</head>
+<body data-page="{{ page }}"><a class="skip-link" href="#main">Skip to content</a><div class="site-frame">
+<header class="site-header"><a class="brand" href="/" aria-label="Model Arcade home"><span class="brand-lockup"><img src="{{ url_for('static',filename='brand/logo-horizontal.png') }}" width="2172" height="724" alt="Model Arcade Lab" fetchpriority="high"></span></a>
+<nav aria-label="Main navigation">{% for id,label,path in [('benchmarks','Benchmarks','/benchmarks'),('project','The project','/project'),('contribute','Contribute','/contribute'),('submit','Suggest an addition','/submit')] %}<a href="{{ path }}" {% if page==id %}class="active" aria-current="page"{% endif %}>{{ label }}{% if id=='submit' %} ↗{% endif %}</a>{% endfor %}</nav>
+<a class="repo-link" href="{{ repo }}" target="_blank" rel="noopener noreferrer">GitHub ↗</a></header>
+<main id="main">{% block content %}{% endblock %}</main>
+<footer class="site-footer"><a class="footer-brand" href="/" aria-label="Model Arcade home"><span class="brand-lockup"><img src="{{ url_for('static',filename='brand/logo-horizontal.png') }}" width="2172" height="724" alt="Model Arcade Lab" loading="lazy"></span><span>SMALL MODELS. OBSERVABLE DECISIONS.</span></a><div><a href="/project">An open experiment in System 1 AI</a><span class="footer-note">Built for curiosity. Read the methods before the rankings.</span></div><div class="footer-links"><a href="{{ repo }}" target="_blank" rel="noopener noreferrer">Source ↗</a><a href="/contribute">Make a contribution ↗</a></div></footer>
+</div></body></html>

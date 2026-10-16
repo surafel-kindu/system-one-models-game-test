@@ -1,0 +1,44 @@
+name: Suggest a game
+description: Propose a console experiment or a game with a browser UI.
+title: "[Game] "
+body:
+  - type: input
+    id: name
+    attributes:
+      label: Game name
+    validations:
+      required: true
+  - type: input
+    id: source
+    attributes:
+      label: Source URL and creator
+      description: Link the repository, rules, assets, or other public source, and credit the creator.
+    validations:
+      required: true
+  - type: dropdown
+    id: delivery
+    attributes:
+      label: Contribution scope
+      options:
+        - Console benchmarks
+        - UI + console benchmarks
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: Rules and decision task
+      description: Describe state, legal actions, scoring, and terminal conditions.
+    validations:
+      required: true
+  - type: textarea
+    id: implementation
+    attributes:
+      label: Implementation and reproducibility
+      description: Explain seeded setup, candidate descriptions, baselines, dependencies, and license/access requirements.
+    validations:
+      required: true
+  - type: input
+    id: reference
+    attributes:
+      label: Website suggestion reference (optional)

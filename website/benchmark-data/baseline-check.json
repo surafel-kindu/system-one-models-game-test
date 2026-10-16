@@ -1,0 +1,398 @@
+{
+  "run_id": "20261016-145713-290d",
+  "records": [
+    {
+      "type": "run",
+      "run_id": "20261016-145713-290d",
+      "game": "multi",
+      "params": {
+        "format": "average",
+        "games": 2,
+        "rounds": 1,
+        "max_plies": 200,
+        "seed": 42,
+        "players": [
+          "random",
+          "greedy",
+          "oracle"
+        ],
+        "control": "assisted",
+        "versions": {
+          "dino": "arcade-v2",
+          "flappy": "arcade-v2"
+        },
+        "suites": [
+          "dino",
+          "flappy"
+        ]
+      },
+      "ts": 1792151833
+    },
+    {
+      "type": "checkpoint",
+      "run_id": "20261016-145713-290d",
+      "game": "dino",
+      "player": "random",
+      "format": "average",
+      "games": 2,
+      "avg_score": 10,
+      "scores": [
+        0,
+        20
+      ],
+      "seconds": 0.0,
+      "control": "assisted",
+      "version": "arcade-v2",
+      "mean": 10,
+      "std": 10.0,
+      "median": 10.0,
+      "min": 0,
+      "max": 20
+    },
+    {
+      "type": "checkpoint",
+      "run_id": "20261016-145713-290d",
+      "game": "dino",
+      "player": "greedy",
+      "format": "average",
+      "games": 2,
+      "avg_score": 1000,
+      "scores": [
+        1000,
+        1000
+      ],
+      "seconds": 0.0,
+      "control": "assisted",
+      "version": "arcade-v2",
+      "mean": 1000,
+      "std": 0.0,
+      "median": 1000.0,
+      "min": 1000,
+      "max": 1000
+    },
+    {
+      "type": "checkpoint",
+      "run_id": "20261016-145713-290d",
+      "game": "dino",
+      "player": "oracle",
+      "format": "average",
+      "games": 2,
+      "avg_score": 1000,
+      "scores": [
+        1000,
+        1000
+      ],
+      "seconds": 0.14,
+      "control": "assisted",
+      "version": "arcade-v2",
+      "mean": 1000,
+      "std": 0.0,
+      "median": 1000.0,
+      "min": 1000,
+      "max": 1000
+    },
+    {
+      "type": "result",
+      "run_id": "20261016-145713-290d",
+      "game": "dino",
+      "player": "random",
+      "format": "average",
+      "games": 2,
+      "avg_score": 10,
+      "std": 10.0,
+      "median": 10.0,
+      "min": 0,
+      "max": 20,
+      "win_share": 0.0,
+      "points_rate": 0.0,
+      "seconds": 0.0,
+      "scores": [
+        0,
+        20
+      ],
+      "seeds": [
+        42,
+        43
+      ],
+      "control": "assisted",
+      "version": "arcade-v2",
+      "died_on": [],
+      "avg_cleared": 1.0,
+      "avg_decisions": 24.5,
+      "avg_model_calls": 0.0,
+      "avg_ms_per_decision": 0.0007886865287300761
+    },
+    {
+      "type": "result",
+      "run_id": "20261016-145713-290d",
+      "game": "dino",
+      "player": "greedy",
+      "format": "average",
+      "games": 2,
+      "avg_score": 1000,
+      "std": 0.0,
+      "median": 1000.0,
+      "min": 1000,
+      "max": 1000,
+      "win_share": 0.5,
+      "points_rate": 0.75,
+      "seconds": 0.0,
+      "scores": [
+        1000,
+        1000
+      ],
+      "seeds": [
+        42,
+        43
+      ],
+      "control": "assisted",
+      "version": "arcade-v2",
+      "died_on": [],
+      "avg_cleared": 100.0,
+      "avg_decisions": 932.0,
+      "avg_model_calls": 0.0,
+      "avg_ms_per_decision": 0.0006460070097856444
+    },
+    {
+      "type": "result",
+      "run_id": "20261016-145713-290d",
+      "game": "dino",
+      "player": "oracle",
+      "format": "average",
+      "games": 2,
+      "avg_score": 1000,
+      "std": 0.0,
+      "median": 1000.0,
+      "min": 1000,
+      "max": 1000,
+      "win_share": 0.5,
+      "points_rate": 0.75,
+      "seconds": 0.14,
+      "scores": [
+        1000,
+        1000
+      ],
+      "seeds": [
+        42,
+        43
+      ],
+      "control": "assisted",
+      "version": "arcade-v2",
+      "died_on": [],
+      "avg_cleared": 100.0,
+      "avg_decisions": 932.0,
+      "avg_model_calls": 0.0,
+      "avg_ms_per_decision": 0.07362698980407487
+    },
+    {
+      "type": "checkpoint",
+      "run_id": "20261016-145713-290d",
+      "game": "flappy",
+      "player": "random",
+      "format": "average",
+      "games": 2,
+      "avg_score": 0,
+      "scores": [
+        0,
+        0
+      ],
+      "seconds": 0.0,
+      "control": "assisted",
+      "version": "arcade-v2",
+      "mean": 0,
+      "std": 0.0,
+      "median": 0.0,
+      "min": 0,
+      "max": 0
+    },
+    {
+      "type": "checkpoint",
+      "run_id": "20261016-145713-290d",
+      "game": "flappy",
+      "player": "greedy",
+      "format": "average",
+      "games": 2,
+      "avg_score": 25,
+      "scores": [
+        20,
+        30
+      ],
+      "seconds": 0.0,
+      "control": "assisted",
+      "version": "arcade-v2",
+      "mean": 25,
+      "std": 5.0,
+      "median": 25.0,
+      "min": 20,
+      "max": 30
+    },
+    {
+      "type": "checkpoint",
+      "run_id": "20261016-145713-290d",
+      "game": "flappy",
+      "player": "oracle",
+      "format": "average",
+      "games": 2,
+      "avg_score": 1000,
+      "scores": [
+        1000,
+        1000
+      ],
+      "seconds": 0.04,
+      "control": "assisted",
+      "version": "arcade-v2",
+      "mean": 1000,
+      "std": 0.0,
+      "median": 1000.0,
+      "min": 1000,
+      "max": 1000
+    },
+    {
+      "type": "result",
+      "run_id": "20261016-145713-290d",
+      "game": "flappy",
+      "player": "random",
+      "format": "average",
+      "games": 2,
+      "avg_score": 0,
+      "std": 0.0,
+      "median": 0.0,
+      "min": 0,
+      "max": 0,
+      "win_share": 0.0,
+      "points_rate": 0.0,
+      "seconds": 0.0,
+      "scores": [
+        0,
+        0
+      ],
+      "seeds": [
+        42,
+        43
+      ],
+      "control": "assisted",
+      "version": "arcade-v2",
+      "died_on": [
+        "ceiling",
+        "ceiling"
+      ],
+      "avg_decisions": 4.0,
+      "avg_model_calls": 0.0,
+      "avg_ms_per_decision": 0.001015624548017513,
+      "avg_pipes": 0.0
+    },
+    {
+      "type": "result",
+      "run_id": "20261016-145713-290d",
+      "game": "flappy",
+      "player": "greedy",
+      "format": "average",
+      "games": 2,
+      "avg_score": 25,
+      "std": 5.0,
+      "median": 25.0,
+      "min": 20,
+      "max": 30,
+      "win_share": 0.0,
+      "points_rate": 0.5,
+      "seconds": 0.0,
+      "scores": [
+        20,
+        30
+      ],
+      "seeds": [
+        42,
+        43
+      ],
+      "control": "assisted",
+      "version": "arcade-v2",
+      "died_on": [
+        "ceiling",
+        "ceiling"
+      ],
+      "avg_decisions": 23.5,
+      "avg_model_calls": 0.0,
+      "avg_ms_per_decision": 0.0007797036245985523,
+      "avg_pipes": 2.5
+    },
+    {
+      "type": "result",
+      "run_id": "20261016-145713-290d",
+      "game": "flappy",
+      "player": "oracle",
+      "format": "average",
+      "games": 2,
+      "avg_score": 1000,
+      "std": 0.0,
+      "median": 1000.0,
+      "min": 1000,
+      "max": 1000,
+      "win_share": 1.0,
+      "points_rate": 1.0,
+      "seconds": 0.04,
+      "scores": [
+        1000,
+        1000
+      ],
+      "seeds": [
+        42,
+        43
+      ],
+      "control": "assisted",
+      "version": "arcade-v2",
+      "died_on": [
+        "cap",
+        "cap"
+      ],
+      "avg_decisions": 604.0,
+      "avg_model_calls": 0.0,
+      "avg_ms_per_decision": 0.03402705623864448,
+      "avg_pipes": 100.0
+    },
+    {
+      "type": "result",
+      "run_id": "20261016-145713-290d",
+      "game": "overall",
+      "player": "greedy",
+      "avg_score": 51.25,
+      "games": 2,
+      "seconds": 0,
+      "per_game": {
+        "dino": 100.0,
+        "flappy": 2.5
+      }
+    },
+    {
+      "type": "result",
+      "run_id": "20261016-145713-290d",
+      "game": "overall",
+      "player": "oracle",
+      "avg_score": 100.0,
+      "games": 2,
+      "seconds": 0,
+      "per_game": {
+        "dino": 100.0,
+        "flappy": 100.0
+      }
+    },
+    {
+      "type": "result",
+      "run_id": "20261016-145713-290d",
+      "game": "overall",
+      "player": "random",
+      "avg_score": 0.5,
+      "games": 2,
+      "seconds": 0,
+      "per_game": {
+        "dino": 1.0,
+        "flappy": 0.0
+      }
+    },
+    {
+      "type": "status",
+      "run_id": "20261016-145713-290d",
+      "status": "complete",
+      "finished_at": 1792151833
+    }
+  ]
+}

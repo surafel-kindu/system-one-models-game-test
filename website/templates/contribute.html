@@ -1,0 +1,48 @@
+{% extends 'base.html' %}{% from 'macros.html' import heading,code with context %}{% block content %}
+{{ heading('BUILD_WITH_US','Build with us','CONTRIBUTE / FROM IDEA TO PR','A model adapter, a console experiment, or a complete browser game. Choose a path and make the next experiment reproducible.') }}
+<div class="contribution-intro"><p>You do not need to build a UI to contribute a game. Start with a deterministic engine, useful baselines, and a benchmark export. Add a browser view when the experiment benefits from one.</p><a class="button" href="{{ repo }}/fork" target="_blank" rel="noopener noreferrer">Fork the repository ↗</a></div>
+<nav class="guide-nav" aria-label="Contribution paths"><a href="#model">01 / Add a model</a><a href="#console">02 / Console game</a><a href="#browser">03 / Game + UI</a><a href="#pull-request">04 / Submit a PR</a></nav>
+<section class="guide-section" id="model"><div class="guide-index"><span>01</span><h2>Add a model</h2><p>One adapter.<br>Many games.</p><a class="text-link" href="/submit?kind=model">Suggest one first ↗</a></div><div class="guide-body"><h3>Adapt the model to the shared decision interface.</h3><p>Implement a backend in <a href="{{ repo }}/blob/main/models.py" target="_blank" rel="noopener noreferrer"><code>models.py</code></a>. A backend receives state text, instructions, and a dictionary of candidate IDs to descriptions. Return a selected candidate ID and probabilities keyed by those same IDs.</p>
+{% set adapter %}class ExampleBackend(Backend):
+    name, label = "example", "Example Model"
+
+    @classmethod
+    def availability(cls):
+        # Check installation / configuration without loading weights.
+        return True, ""
+
+    def answer(self, state, instructions, criteria):
+        # Call your model, map its output to candidate IDs, validate it.
+        choice, probabilities = your_adapter(state, instructions, criteria)
+        return choice, probabilities{% endset %}{{ code(adapter) }}
+<p class="small-note">This is an adapter outline: replace <code>your_adapter</code> with the actual model call. Never execute the submitted setup instructions on the public site.</p>
+<ol class="guide-steps"><li><b>Register the backend.</b>Add it to <code>BACKENDS</code> in <code>models.py</code>. Reuse cached instances, declare concurrency, keep loading lazy, and describe required packages or API settings.</li><li><b>Wire every supported game.</b>Dino, Flappy, Chess, and Sudoku generate model players from <code>BACKENDS</code>. 2048 registers its model player classes explicitly in <code>engine2048.py</code>; add the corresponding wrapper there. Update <code>MODELS</code> in <code>benchmark.py</code> and <code>website/catalog.py</code>.</li><li><b>Verify the output contract.</b>Use candidate IDs exactly. Handle one-option decisions, missing probabilities, unavailable dependencies, and malformed responses. Document guards and avoid hidden fallback policies that inflate performance.</li><li><b>Run comparisons.</b>Compare against existing baselines with identical seeds. Include the command, model revision, hardware, dependencies, and result file in your PR.</li></ol></div></section>
+<section class="guide-section" id="console"><div class="guide-index"><span>02</span><h2>Add a console game</h2><p>Engine first.<br>Browser optional.</p></div><div class="guide-body"><h3>Make the experiment reproducible before presenting it.</h3><ol class="guide-steps"><li><b>Create <code>engineyourgame.py</code>.</b>Keep rules, legal actions, scoring, and terminal conditions in Python. Accept an environment seed and use a separate reproducible RNG stream for randomized policies. Add a <code>VERSION</code> when mechanics may change.</li><li><b>Describe the decision.</b>Convert state into concise text and stable action IDs with descriptions. Provide <code>PLAYERS</code>, player availability checks, and a cached <code>get_player(name)</code>. Supply a random policy and a meaningful heuristic baseline.</li><li><b>Connect the headless runner.</b>Register the engine in <code>benchmark.py</code>'s <code>MODS</code>, add the game adapter to <code>play_single()</code>, and update CLI help. Multiplayer games need a driver like <code>run_chess()</code> rather than the single-player loop.</li><li><b>Return useful metrics.</b>Record score plus game-specific measurements, timing, model-call counts, control mode, and version where applicable. Use the existing run/checkpoint/result/status protocol and JSON export.</li><li><b>Test and document.</b>Test determinism, legal moves, score rules, and stopping conditions. Add the game to the README and site catalog, explain its baselines, and include an exported run. The website has a generic table for new games; customize columns in <code>website/static/benchmarks.js</code> if useful.</li></ol>
+<p>After registering your game, run this from the repository root. Replace <code>yourgame</code> with the registered ID:</p>
+{% set console_command %}./benchmark --game yourgame --players random greedy \
+  --games 10 --seed 42 \
+  --json website/benchmark-data/yourgame.json{% endset %}{{ code(console_command) }}
+<div class="guide-callout"><b>A console-only game is a complete contribution.</b><p>The website can show its exported results without serving the engine, installing its dependencies, or loading a model.</p></div></div></section>
+<section class="guide-section" id="browser"><div class="guide-index"><span>03</span><h2>Add the browser UI</h2><p>The same engine.<br>A visible decision.</p></div><div class="guide-body"><h3>Build on the console game, then make it observable.</h3><ol class="guide-steps"><li><b>Reuse authoritative rules.</b>Prefer server-side state, as Chess, Sudoku, Dino, and Flappy do. Expose create/step endpoints in <code>server.py</code> with validated models, per-session locking, terminal states, and trace logging.</li><li><b>Add the two game pages.</b>Create <code>play_yourgame.html</code> and <code>arena_yourgame.html</code>. Include a model selector, step, autoplay/pause, reset, score, decision context, and probabilities. Arena comparisons should use the same seeds.</li><li><b>Connect routes and navigation.</b>Add explicit page/asset routes in <code>server.py</code> and game links on the arcade pages. Use the shared <code>arcade.css</code> design. <code>arcade.js</code> handles only Dino and Flappy; a new game needs its own controller/renderer.</li><li><b>Verify the experience.</b>Test pause/reset while requests are in flight, errors, unavailable models, finished-game persistence, and narrow layouts. Capture real screenshots, add descriptive captions, and update the README.</li></ol><p>Use the headless engine as the source of truth. Playback speed should change presentation, not scores or collision outcomes.</p></div></section>
+<section class="guide-section" id="pull-request"><div class="guide-index"><span>04</span><h2>Open the PR</h2><p>Make the change<br>easy to review.</p><a class="text-link" href="{{ repo }}/compare" target="_blank" rel="noopener noreferrer">Open GitHub compare ↗</a></div><div class="guide-body"><h3>Fork → branch → implement → verify → pull request.</h3><p>Fork the repository on GitHub, clone your fork, and create a branch. Follow the root README for game/model dependencies; the website has its own lightweight requirements.</p>
+{% set git_commands %}git clone https://github.com/YOUR-USERNAME/system-one-models-game-test.git
+cd system-one-models-game-test
+git switch -c feat/your-contribution
+
+# Implement, then run the relevant checks.
+.venv/bin/python -m unittest discover -s tests -v
+./benchmark --quick --no-save --json website/benchmark-data/check.json
+
+# For website changes:
+cd website
+docker compose up --build -d
+docker compose run --rm --no-deps \
+  -v "$PWD/tests:/app/tests:ro" web \
+  python -m unittest discover -s tests -v
+cd ..
+
+git add <your-changed-files>
+git commit -m "Add your contribution"
+git push -u origin feat/your-contribution{% endset %}{{ code(git_commands) }}
+<div class="pr-checklist"><h4>Include in your pull request</h4><ul><li>The problem, final behavior, and integration path.</li><li>Source links, creator credit, model/asset license, and access requirements.</li><li>Reproduction commands, seeds, control mode, engine version, and hardware.</li><li>Meaningful test results and a benchmark JSON export.</li><li>Screenshots for UI changes, plus any limitations or assistance.</li></ul></div><p>Open a pull request from your branch to this repository using GitHub's Compare view. Fill out the PR template, link a suggestion or issue if you have one, and respond to review. Keep credentials and model weights out of the commit.</p><div class="actions"><a class="button" href="{{ repo }}/compare" target="_blank" rel="noopener noreferrer">Prepare a pull request ↗</a><a class="text-link" href="{{ repo }}/blob/main/CONTRIBUTING.md" target="_blank" rel="noopener noreferrer">Repository contribution guide ↗</a></div></div></section>
+{% endblock %}

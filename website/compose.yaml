@@ -1,0 +1,35 @@
+name: model-arcade-site
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "${HOST_BIND:-127.0.0.1}:${PORT:-8080}:8000"
+    environment:
+      BENCHMARK_DIR: /benchmarks
+      DATA_DIR: /data
+      REPOSITORY_URL: ${REPOSITORY_URL:-https://github.com/surafel-kindu/system-one-models-game-test}
+      PUBLIC_URL: ${PUBLIC_URL:-}
+      TRUST_PROXY: ${TRUST_PROXY:-0}
+      SUBMISSIONS_PER_HOUR: ${SUBMISSIONS_PER_HOUR:-5}
+    volumes:
+      - type: bind
+        source: ${BENCHMARK_DIR:-./benchmark-data}
+        target: /benchmarks
+        read_only: true
+        bind:
+          create_host_path: false
+      - submissions:/data
+    read_only: true
+    tmpfs:
+      - /tmp:size=32m,mode=1777
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/healthz', timeout=3)"]
+      interval: 20s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+volumes:
+  submissions:

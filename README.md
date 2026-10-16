@@ -139,6 +139,15 @@ Capture settings and reproduction steps are in [the screenshot guide](docs/scree
 
 ## Quick start
 
+For the public project/benchmark website, use the standalone [website folder](website/README.md):
+
+```bash
+cd website
+docker compose up --build -d
+```
+
+Open <http://localhost:8080>. It reads benchmark folders, explains the project, accepts model/game suggestions into a persistent private review queue, and includes contribution and PR guides. Optional domain/HTTPS hosting is documented in that folder. It runs independently of the model/game environment below. See [CONTRIBUTING.md](CONTRIBUTING.md) to add a model or a game with or without a browser UI.
+
 Requires Python 3.10+. The server starts immediately; each local model loads on its first decision.
 The first use of an uncached model downloads its checkpoint (which can take a few minutes).
 
@@ -564,6 +573,7 @@ running 14 games across 7 backends concurrently: 0 errors, server still up.
 | `arcade.js` | Dino/Flappy animation and controls (no game physics) |
 | `benchmark`, `benchmark_console.py` | Venv-aware launcher and dependency-free terminal progress dashboard |
 | `tests/test_arcade.py` | Physics, model-control, API, persistence and benchmark regressions |
+| `website/` | Standalone Docker Compose project/benchmark site, persistent model/game suggestions, and contribution guides |
 | `.env.example` | Template for your API key (copy to `.env`) |
 | `results_<game>.json` | Saved arena results per game (created on first finish, git-ignored) |
 | `benchmark.py` | Unified headless runner: any game(s) × any players, with `average` / `versus` / `round-robin` formats and an overall leaderboard — see [BENCHMARKING.md](BENCHMARKING.md) |

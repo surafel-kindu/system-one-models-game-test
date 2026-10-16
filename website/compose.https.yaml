@@ -1,0 +1,24 @@
+services:
+  web:
+    environment:
+      PUBLIC_URL: https://${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN in .env}
+      TRUST_PROXY: "1"
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      PUBLIC_DOMAIN: ${PUBLIC_DOMAIN:?Set PUBLIC_DOMAIN in .env}
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      web:
+        condition: service_healthy
+volumes:
+  caddy-data:
+  caddy-config:
